@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DEV.ITISYOU - Diagnostic Engine</title>
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary-fixed-dim": "#adc6ff",
+                      "surface": "#0b1326",
+                      "technical-teal": "#0D9488",
+                      "surface-variant": "#2d3449",
+                      "secondary-fixed": "#89f5e7",
+                      "status-reproduced": "#F472B6",
+                      "outline": "#8c909f",
+                      "surface-container": "#171f33",
+                      "surface-container-highest": "#2d3449",
+                      "tertiary-fixed": "#ffdcc6",
+                      "error-container": "#93000a",
+                      "on-primary-container": "#00285d",
+                      "status-confirmed": "#818CF8",
+                      "tertiary-container": "#df7412",
+                      "on-tertiary-container": "#461f00",
+                      "surface-tint": "#adc6ff",
+                      "inverse-primary": "#005ac2",
+                      "background": "#0b1326",
+                      "on-secondary": "#003732",
+                      "tertiary": "#ffb786",
+                      "outline-variant": "#424754",
+                      "on-tertiary": "#502400",
+                      "destructive-red": "#EF4444",
+                      "status-ci-verified": "#34D399",
+                      "on-tertiary-fixed": "#311400",
+                      "on-secondary-container": "#00302b",
+                      "on-primary": "#002e6a",
+                      "inverse-surface": "#dae2fd",
+                      "evidence-blue": "#3B82F6",
+                      "primary": "#adc6ff",
+                      "diagnostic-node-bg": "#1E293B",
+                      "inverse-on-surface": "#283044",
+                      "warning-amber": "#F59E0B",
+                      "surface-container-high": "#222a3d",
+                      "secondary-container": "#29a195",
+                      "surface-bright": "#31394d",
+                      "on-surface-variant": "#c2c6d6",
+                      "on-surface": "#dae2fd",
+                      "primary-container": "#4d8eff",
+                      "on-background": "#dae2fd",
+                      "on-tertiary-fixed-variant": "#723600",
+                      "primary-fixed": "#d8e2ff",
+                      "surface-container-low": "#131b2e",
+                      "tertiary-fixed-dim": "#ffb786",
+                      "on-error": "#690005",
+                      "error": "#ffb4ab",
+                      "on-secondary-fixed-variant": "#005049",
+                      "on-error-container": "#ffdad6",
+                      "status-documented": "#94A3B8",
+                      "on-primary-fixed-variant": "#004395",
+                      "surface-container-lowest": "#060e20",
+                      "secondary": "#6bd8cb",
+                      "surface-dim": "#0b1326",
+                      "secondary-fixed-dim": "#6bd8cb",
+                      "on-primary-fixed": "#001a42",
+                      "on-secondary-fixed": "#00201d"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "density-high": "8px",
+                      "gutter": "16px",
+                      "margin": "24px",
+                      "density-compact": "4px",
+                      "unit": "4px"
+              },
+              "fontFamily": {
+                      "headline-md": ["Inter", "sans-serif"],
+                      "headline-lg": ["Inter", "sans-serif"],
+                      "label-caps": ["JetBrains Mono", "monospace"],
+                      "body-sm": ["Inter", "sans-serif"],
+                      "code-block": ["JetBrains Mono", "monospace"],
+                      "env-tag": ["JetBrains Mono", "monospace"],
+                      "body-md": ["Inter", "sans-serif"]
+              },
+              "fontSize": {
+                      "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                      "headline-lg": ["30px", {"lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600"}],
+                      "label-caps": ["11px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                      "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                      "code-block": ["13px", {"lineHeight": "20px", "fontWeight": "400"}],
+                      "env-tag": ["12px", {"lineHeight": "14px", "fontWeight": "500"}],
+                      "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        .tree-line-v { width: 1px; background-color: #424754; height: 24px; margin-left: 20px; }
+        .tree-line-h { height: 1px; background-color: #424754; width: 24px; }
+        .diagnostic-pulse { animation: pulseBorder 2s infinite; }
+        @keyframes pulseBorder {
+            0% { border-color: #EF4444; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            70% { border-color: #EF4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+            100% { border-color: #EF4444; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        /* Custom scrollbar for text area */
+        textarea::-webkit-scrollbar { width: 8px; }
+        textarea::-webkit-scrollbar-track { background: transparent; }
+        textarea::-webkit-scrollbar-thumb { background: #424754; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col antialiased">
+<!-- Global Nav (TopNavBar Component implementation) -->
+<nav class="sticky bg-surface-container-low dark:bg-surface-container-low border-b border-outline-variant dark:border-outline-variant docked full-width top-0 flat no shadows flex justify-between items-center w-full px-margin h-16 z-50">
+<div class="flex items-center gap-gutter">
+<!-- Brand Logo -->
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim tracking-tight">
+                DEV.ITISYOU
+            </div>
+<!-- Search Bar (on_left structural layout) -->
+<div class="hidden md:flex items-center bg-surface-container border border-outline-variant rounded-DEFAULT px-3 py-1.5 ml-4">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px] mr-2" data-icon="search">search</span>
+<input class="bg-transparent border-none outline-none text-body-sm font-body-sm text-on-surface w-64 placeholder-on-surface-variant focus:ring-0 p-0" placeholder="Search verified playbooks..." type="text"/>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="hidden md:flex items-center gap-gutter">
+<a class="text-on-surface-variant font-medium font-label-caps text-label-caps hover:bg-surface-container-highest transition-colors px-3 py-2 rounded-DEFAULT uppercase" href="#">Playbooks</a>
+<a class="text-on-surface-variant font-medium font-label-caps text-label-caps hover:bg-surface-container-highest transition-colors px-3 py-2 rounded-DEFAULT uppercase" href="#">Contribute</a>
+</div>
+<!-- Trailing Icon Actions -->
+<div class="flex items-center gap-density-high">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-highest transition-colors rounded-DEFAULT flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-highest transition-colors rounded-DEFAULT flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col items-center w-full max-w-[1280px] mx-auto px-margin py-12 md:py-24 gap-24">
+<!-- Hero Section -->
+<section class="w-full flex flex-col items-center text-center max-w-4xl mx-auto">
+<h1 class="font-headline-lg text-headline-lg text-on-surface mb-4">Don't guess. Test.</h1>
+<p class="font-body-md text-body-md text-on-surface-variant mb-8 max-w-2xl">
+                Paste your error, stack trace, logs, or describe the problem. Follow a verified diagnostic path to the root cause.
+            </p>
+<!-- Diagnostic Omnibox -->
+<div class="w-full relative flex flex-col">
+<div class="absolute top-4 left-4 text-outline-variant font-code-block text-code-block select-none flex flex-col items-end w-4 text-right">
+<span>1</span><span>2</span><span>3</span><span>4</span>
+</div>
+<textarea class="w-full h-40 bg-[#0F172A] border border-outline-variant rounded-DEFAULT p-4 pl-12 font-code-block text-code-block text-on-surface focus:border-evidence-blue focus:ring-1 focus:ring-evidence-blue outline-none resize-none transition-colors" placeholder="Paste an error, stack trace, log, or describe what's broken..." spellcheck="false"></textarea>
+<button class="absolute bottom-4 right-4 bg-primary text-on-primary font-label-caps text-label-caps px-4 py-2 rounded-DEFAULT hover:opacity-90 transition-opacity uppercase">
+                    Diagnose
+                </button>
+</div>
+<!-- Environment Toggle -->
+<div class="flex items-center gap-2 mt-4 self-start md:self-center">
+<input checked="" class="rounded-DEFAULT border-outline-variant bg-surface-container text-evidence-blue focus:ring-evidence-blue h-4 w-4" id="env-toggle" type="checkbox"/>
+<label class="font-body-sm text-body-sm text-on-surface-variant cursor-pointer" for="env-toggle">
+                    Use my current environment <span class="font-env-tag text-env-tag text-on-surface bg-surface-variant px-1.5 py-0.5 rounded-DEFAULT ml-1">Ubuntu 24.04, Node 22</span>
+</label>
+</div>
+</section>
+<!-- Visual Demonstration (Branching Tree) -->
+<section class="w-full flex flex-col items-center">
+<div class="text-center mb-8">
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Verified Diagnostic Paths</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Navigate complex systems procedurally.</p>
+</div>
+<!-- Conceptual Tree UI -->
+<div class="bg-surface-container border border-outline-variant rounded-lg p-8 w-full max-w-3xl overflow-x-auto">
+<div class="flex flex-col items-start min-w-[600px]">
+<!-- Root Node -->
+<div class="flex items-center">
+<div class="bg-diagnostic-node-bg border border-outline-variant rounded-DEFAULT p-3 flex items-center gap-3 w-64 border-l-2 border-l-on-surface-variant">
+<span class="material-symbols-outlined text-outline-variant" data-icon="bug_report">bug_report</span>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-on-surface uppercase">Initial Report</span>
+<span class="font-code-block text-code-block text-on-surface-variant text-[11px] truncate">Unhandled Promise Rejection</span>
+</div>
+</div>
+</div>
+<div class="tree-line-v"></div>
+<!-- Level 1 -->
+<div class="flex items-center">
+<div class="bg-diagnostic-node-bg border border-outline-variant rounded-DEFAULT p-3 flex items-center gap-3 w-64 border-l-2 border-l-primary shadow-[inset_2px_0_0_0_#adc6ff]">
+<span class="material-symbols-outlined text-primary" data-icon="network_check">network_check</span>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-primary uppercase">Test A: Connectivity</span>
+<span class="font-code-block text-code-block text-on-surface-variant text-[11px]">ping api.internal</span>
+</div>
+</div>
+<div class="tree-line-h"></div>
+<div class="bg-surface-variant border border-outline-variant rounded-full px-3 py-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-status-ci-verified text-[14px]" data-icon="check_circle">check_circle</span>
+<span class="font-label-caps text-label-caps text-status-ci-verified uppercase">Pass</span>
+</div>
+</div>
+<div class="tree-line-v"></div>
+<!-- Level 2 (Fail Path) -->
+<div class="flex items-start">
+<div class="bg-diagnostic-node-bg border border-outline-variant diagnostic-pulse rounded-DEFAULT p-3 flex items-center gap-3 w-64 border-l-2 border-l-destructive-red">
+<span class="material-symbols-outlined text-destructive-red" data-icon="database">database</span>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-destructive-red uppercase">Test B: Auth Pool</span>
+<span class="font-code-block text-code-block text-on-surface-variant text-[11px]">Check pg_stat_activity</span>
+</div>
+</div>
+<div class="flex flex-col pt-4">
+<div class="tree-line-h"></div>
+</div>
+<div class="flex flex-col gap-4 mt-1">
+<div class="bg-surface-variant border border-outline-variant rounded-full px-3 py-1 flex items-center gap-1 w-fit">
+<span class="material-symbols-outlined text-destructive-red text-[14px]" data-icon="error">error</span>
+<span class="font-label-caps text-label-caps text-destructive-red uppercase">Fail</span>
+</div>
+<!-- Resolution -->
+<div class="flex items-center gap-3">
+<div class="w-8 h-px bg-outline-variant"></div>
+<div class="bg-surface-container-high border border-evidence-blue rounded-DEFAULT p-3 flex items-center gap-3 w-56 relative overflow-hidden">
+<div class="absolute inset-0 bg-evidence-blue opacity-5"></div>
+<span class="material-symbols-outlined text-evidence-blue" data-icon="verified">verified</span>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-on-surface uppercase">Root Cause Verified</span>
+<span class="font-body-sm text-body-sm text-evidence-blue">Max connections exceeded.</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Recently Verified Cards -->
+<section class="w-full">
+<div class="flex justify-between items-end mb-6">
+<h3 class="font-headline-md text-headline-md text-on-surface">Recently Verified Playbooks</h3>
+<a class="font-label-caps text-label-caps text-primary hover:underline uppercase flex items-center gap-1" href="#">View All <span class="material-symbols-outlined text-[14px]" data-icon="arrow_forward">arrow_forward</span></a>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter w-full">
+<!-- Card 1 -->
+<div class="bg-surface-container border border-outline-variant rounded-lg p-margin flex flex-col gap-4 hover:bg-surface-container-high transition-colors cursor-pointer relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-wrap gap-2">
+<span class="font-env-tag text-env-tag bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-DEFAULT border border-outline-variant">Cloudflare D1</span>
+<span class="font-env-tag text-env-tag bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-DEFAULT border border-outline-variant">SQLite</span>
+</div>
+</div>
+<h4 class="font-body-md text-body-md font-bold text-on-surface group-hover:text-primary transition-colors line-clamp-2">SQLITE_BUSY locking error during concurrent writes</h4>
+<div class="mt-auto flex items-center justify-between pt-4 border-t border-outline-variant">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span>
+<span class="font-body-sm text-body-sm">8m est.</span>
+</div>
+<div class="flex items-center gap-1 bg-surface-variant px-2 py-1 rounded-DEFAULT border border-status-ci-verified border-opacity-30">
+<span class="material-symbols-outlined text-status-ci-verified text-[14px]" data-icon="policy">policy</span>
+<span class="font-label-caps text-label-caps text-status-ci-verified uppercase">Strong Match</span>
+</div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container border border-outline-variant rounded-lg p-margin flex flex-col gap-4 hover:bg-surface-container-high transition-colors cursor-pointer relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-wrap gap-2">
+<span class="font-env-tag text-env-tag bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-DEFAULT border border-outline-variant">K8s</span>
+<span class="font-env-tag text-env-tag bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-DEFAULT border border-outline-variant">PostgreSQL</span>
+</div>
+</div>
+<h4 class="font-body-md text-body-md font-bold text-on-surface group-hover:text-primary transition-colors line-clamp-2">Pod Eviction OOMKilled during vacuum operation</h4>
+<div class="mt-auto flex items-center justify-between pt-4 border-t border-outline-variant">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span>
+<span class="font-body-sm text-body-sm">12m est.</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-evidence-blue text-[14px]" data-icon="how_to_reg">how_to_reg</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">42 Confirms</span>
+</div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container border border-outline-variant rounded-lg p-margin flex flex-col gap-4 hover:bg-surface-container-high transition-colors cursor-pointer relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-wrap gap-2">
+<span class="font-env-tag text-env-tag bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-DEFAULT border border-outline-variant">Next.js</span>
+<span class="font-env-tag text-env-tag bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-DEFAULT border border-outline-variant">Vercel</span>
+</div>
+</div>
+<h4 class="font-body-md text-body-md font-bold text-on-surface group-hover:text-primary transition-colors line-clamp-2">Hydration mismatch on dynamically imported components</h4>
+<div class="mt-auto flex items-center justify-between pt-4 border-t border-outline-variant">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span>
+<span class="font-body-sm text-body-sm">5m est.</span>
+</div>
+<div class="flex items-center gap-1 bg-surface-variant px-2 py-1 rounded-DEFAULT border border-status-ci-verified border-opacity-30">
+<span class="material-symbols-outlined text-status-ci-verified text-[14px]" data-icon="policy">policy</span>
+<span class="font-label-caps text-label-caps text-status-ci-verified uppercase">Strong Match</span>
+</div>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container border border-outline-variant rounded-lg p-margin flex flex-col gap-4 hover:bg-surface-container-high transition-colors cursor-pointer relative group">
+<div class="flex justify-between items-start">
+<div class="flex flex-wrap gap-2">
+<span class="font-env-tag text-env-tag bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-DEFAULT border border-outline-variant">Docker</span>
+<span class="font-env-tag text-env-tag bg-surface-variant text-on-surface-variant px-2 py-0.5 rounded-DEFAULT border border-outline-variant">Networking</span>
+</div>
+</div>
+<h4 class="font-body-md text-body-md font-bold text-on-surface group-hover:text-primary transition-colors line-clamp-2">Bridge network DNS resolution failure intermittent</h4>
+<div class="mt-auto flex items-center justify-between pt-4 border-t border-outline-variant">
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]" data-icon="schedule">schedule</span>
+<span class="font-body-sm text-body-sm">15m est.</span>
+</div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-evidence-blue text-[14px]" data-icon="how_to_reg">how_to_reg</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">18 Confirms</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- How It Works (Steps) -->
+<section class="w-full py-12 border-t border-b border-outline-variant bg-[#0F172A]">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-12 text-center max-w-5xl mx-auto px-margin">
+<div class="flex flex-col items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-primary" data-icon="search">search</span>
+</div>
+<h4 class="font-headline-md text-[18px] font-semibold text-on-surface">1. Find</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Paste your symptoms. We match it against verified playbooks mapped to actual engineering failures.</p>
+</div>
+<div class="flex flex-col items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-evidence-blue" data-icon="account_tree">account_tree</span>
+</div>
+<h4 class="font-headline-md text-[18px] font-semibold text-on-surface">2. Test</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Follow a logical tree of diagnostic commands to narrow down the root cause systematically.</p>
+</div>
+<div class="flex flex-col items-center gap-4">
+<div class="w-12 h-12 rounded-full bg-surface-container flex items-center justify-center border border-outline-variant">
+<span class="material-symbols-outlined text-status-ci-verified" data-icon="shield">shield</span>
+</div>
+<h4 class="font-headline-md text-[18px] font-semibold text-on-surface">3. Evidence</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Implement solutions backed by community verification and technical evidence, not guesses.</p>
+</div>
+</div>
+</section>
+<!-- Comparison Table -->
+<section class="w-full max-w-4xl mx-auto mb-12">
+<h3 class="font-headline-md text-headline-md text-on-surface text-center mb-8">Why DEV.ITISYOU</h3>
+<div class="overflow-hidden rounded-lg border border-outline-variant bg-surface-container">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b border-outline-variant bg-surface-container-low">
+<th class="p-4 font-label-caps text-label-caps text-on-surface-variant uppercase w-1/4">Aspect</th>
+<th class="p-4 font-label-caps text-label-caps text-on-surface-variant uppercase w-1/4">General AI</th>
+<th class="p-4 font-label-caps text-label-caps text-on-surface-variant uppercase w-1/4">Forums/SO</th>
+<th class="p-4 font-label-caps text-label-caps text-primary uppercase w-1/4 bg-surface-container-high border-l border-r border-outline-variant">DEV.ITISYOU</th>
+</tr>
+</thead>
+<tbody class="font-body-sm text-body-sm text-on-surface">
+<tr class="border-b border-outline-variant">
+<td class="p-4 text-on-surface-variant font-medium">Methodology</td>
+<td class="p-4">Statistical Guesses</td>
+<td class="p-4">Anecdotal Fixes</td>
+<td class="p-4 bg-surface-container-high border-l border-r border-outline-variant text-evidence-blue font-medium">Verified Diagnostic Trees</td>
+</tr>
+<tr class="border-b border-outline-variant">
+<td class="p-4 text-on-surface-variant font-medium">Hallucinations</td>
+<td class="p-4 text-destructive-red">High Risk</td>
+<td class="p-4 text-warning-amber">Outdated Info</td>
+<td class="p-4 bg-surface-container-high border-l border-r border-outline-variant text-status-ci-verified">None (Immutable Trees)</td>
+</tr>
+<tr>
+<td class="p-4 text-on-surface-variant font-medium">Time to Resolution</td>
+<td class="p-4">Variable</td>
+<td class="p-4">Hours / Days</td>
+<td class="p-4 bg-surface-container-high border-l border-r border-outline-variant font-medium">Minutes</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full border-t border-outline-variant py-6 mt-auto bg-surface-container-low">
+<div class="max-w-[1280px] mx-auto px-margin flex flex-col md:flex-row justify-between items-center gap-4">
+<div class="font-label-caps text-label-caps text-on-surface-variant uppercase">
+                © 2024 DEV.ITISYOU
+            </div>
+<div class="flex items-center gap-6">
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" href="#">Privacy</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors" href="#">Terms</a>
+<a class="font-body-sm text-body-sm text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1" href="#">
+<span class="material-symbols-outlined text-[16px]" data-icon="share">share</span> ITISYOU Network
+                </a>
+</div>
+</div>
+</footer>
+</body></html>

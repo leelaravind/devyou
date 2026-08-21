@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DEV.ITISYOU - Root Cause &amp; Resolution</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#adc6ff",
+                        "surface": "#0b1326",
+                        "technical-teal": "#0D9488",
+                        "surface-variant": "#2d3449",
+                        "secondary-fixed": "#89f5e7",
+                        "status-reproduced": "#F472B6",
+                        "outline": "#8c909f",
+                        "surface-container": "#171f33",
+                        "surface-container-highest": "#2d3449",
+                        "tertiary-fixed": "#ffdcc6",
+                        "error-container": "#93000a",
+                        "on-primary-container": "#00285d",
+                        "status-confirmed": "#818CF8",
+                        "tertiary-container": "#df7412",
+                        "on-tertiary-container": "#461f00",
+                        "surface-tint": "#adc6ff",
+                        "inverse-primary": "#005ac2",
+                        "background": "#0b1326",
+                        "on-secondary": "#003732",
+                        "tertiary": "#ffb786",
+                        "outline-variant": "#424754",
+                        "on-tertiary": "#502400",
+                        "destructive-red": "#EF4444",
+                        "status-ci-verified": "#34D399",
+                        "on-tertiary-fixed": "#311400",
+                        "on-secondary-container": "#00302b",
+                        "on-primary": "#002e6a",
+                        "inverse-surface": "#dae2fd",
+                        "evidence-blue": "#3B82F6",
+                        "primary": "#adc6ff",
+                        "diagnostic-node-bg": "#1E293B",
+                        "inverse-on-surface": "#283044",
+                        "warning-amber": "#F59E0B",
+                        "surface-container-high": "#222a3d",
+                        "secondary-container": "#29a195",
+                        "surface-bright": "#31394d",
+                        "on-surface-variant": "#c2c6d6",
+                        "on-surface": "#dae2fd",
+                        "primary-container": "#4d8eff",
+                        "on-background": "#dae2fd",
+                        "on-tertiary-fixed-variant": "#723600",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-container-low": "#131b2e",
+                        "tertiary-fixed-dim": "#ffb786",
+                        "on-error": "#690005",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed-variant": "#005049",
+                        "on-error-container": "#ffdad6",
+                        "status-documented": "#94A3B8",
+                        "on-primary-fixed-variant": "#004395",
+                        "surface-container-lowest": "#060e20",
+                        "secondary": "#6bd8cb",
+                        "surface-dim": "#0b1326",
+                        "secondary-fixed-dim": "#6bd8cb",
+                        "on-primary-fixed": "#001a42",
+                        "on-secondary-fixed": "#00201d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "density-high": "8px",
+                        "gutter": "16px",
+                        "margin": "24px",
+                        "density-compact": "4px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "code-block": ["JetBrains Mono"],
+                        "env-tag": ["JetBrains Mono"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "code-block": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "env-tag": ["12px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Custom scrollbar for webkit to match the technical aesthetic */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: theme('colors.surface-container-lowest');
+        }
+        ::-webkit-scrollbar-thumb {
+            background: theme('colors.outline-variant');
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: theme('colors.outline');
+        }
+        
+        .syntax-keyword { color: theme('colors.evidence-blue'); }
+        .syntax-function { color: theme('colors.status-confirmed'); }
+        .syntax-string { color: theme('colors.status-ci-verified'); }
+        .syntax-comment { color: theme('colors.on-surface-variant'); font-style: italic; }
+        .syntax-punctuation { color: theme('colors.outline'); }
+    </style>
+</head>
+<body class="bg-background text-on-background h-screen w-full overflow-hidden flex selection:bg-primary-container selection:text-on-primary-container">
+<!-- SideNavBar (Shared Component) -->
+<nav class="hidden md:flex flex-col h-full w-[280px] py-margin bg-surface-container z-40 docked fixed left-0 top-0 border-r border-outline-variant dark:border-outline-variant flat no shadows">
+<!-- Header -->
+<div class="px-margin mb-8 flex items-center gap-3">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface-container-highest border border-outline-variant flex items-center justify-center shrink-0 overflow-hidden">
+<img alt="System Status" class="w-full h-full object-cover opacity-80" data-alt="A highly detailed macro photograph of a glowing fiber optic termination point in a sterile server room. High-contrast cool lighting, deep blacks, and sharp focus conveying technical precision and system status stability." src="https://lh3.googleusercontent.com/aida-public/AB6AXuA2VnU8J7bnvY0IWok44z9DM_wPjcDL8WJkdZ-OG7y-sP3ZPkOzhCjbZkaH7IXbZNMpSN2jJFqX5oK2inyFvaxxzCyc6Xxt_7N2zM4AmSCQW2LoRtRtu0beJYDKZ8IloWgz-fLX3-79YCFTyCqYhrTZHXyt-DAKQMJT0pdIVRwjb5yW2YoMkRNyhqqDqGja-rRslY6tMSYpPHt0-X4bI2etItBXURPbpoE7EZvFlwOyRMQK_c9dYNup-Q"/>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim leading-none">Admin Shell</h1>
+<span class="font-label-caps text-label-caps text-on-surface-variant opacity-80 block mt-1">v2.4.0-stable</span>
+</div>
+</div>
+<!-- Main Tabs -->
+<div class="flex-1 px-density-high flex flex-col gap-1 overflow-y-auto">
+<!-- Inactive: Environment -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all group" href="#">
+<span class="material-symbols-outlined text-[18px] opacity-70 group-hover:opacity-100 transition-opacity">settings_input_component</span>
+<span class="font-label-caps text-label-caps mt-0.5">Environment</span>
+</a>
+<!-- Active: Diagnostics (Mapping logic applied here) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT border-l-2 border-primary bg-surface-container-high text-primary font-bold opacity-80 scale-95 transition-all translate-x-1 duration-150" href="#">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">account_tree</span>
+<span class="font-label-caps text-label-caps mt-0.5">Diagnostics</span>
+</a>
+<!-- Inactive: Evidence -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all group" href="#">
+<span class="material-symbols-outlined text-[18px] opacity-70 group-hover:opacity-100 transition-opacity">verified_user</span>
+<span class="font-label-caps text-label-caps mt-0.5">Evidence</span>
+</a>
+<!-- Inactive: History -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all group" href="#">
+<span class="material-symbols-outlined text-[18px] opacity-70 group-hover:opacity-100 transition-opacity">history</span>
+<span class="font-label-caps text-label-caps mt-0.5">History</span>
+</a>
+<!-- Inactive: Settings -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all group" href="#">
+<span class="material-symbols-outlined text-[18px] opacity-70 group-hover:opacity-100 transition-opacity">tune</span>
+<span class="font-label-caps text-label-caps mt-0.5">Settings</span>
+</a>
+<!-- CTA Button -->
+<div class="px-3 mt-6 mb-4">
+<button class="w-full flex items-center justify-center gap-2 py-2 px-4 bg-primary text-on-primary rounded-DEFAULT hover:bg-primary-fixed transition-colors border border-primary-fixed-dim/20">
+<span class="material-symbols-outlined text-[16px]">add</span>
+<span class="font-label-caps text-label-caps">New Playbook</span>
+</button>
+</div>
+</div>
+<!-- Footer Tabs -->
+<div class="px-density-high mt-auto border-t border-outline-variant pt-density-high">
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all group" href="#">
+<span class="material-symbols-outlined text-[18px] opacity-70 group-hover:opacity-100 transition-opacity">description</span>
+<span class="font-body-sm text-body-sm">Docs</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all group" href="#">
+<span class="material-symbols-outlined text-[18px] opacity-70 group-hover:opacity-100 transition-opacity">help</span>
+<span class="font-body-sm text-body-sm">Support</span>
+</a>
+</div>
+</nav>
+<!-- Main Content Canvas (Fluid Area) -->
+<main class="flex-1 md:ml-[280px] h-full overflow-y-auto bg-background p-gutter lg:p-margin xl:px-12 xl:py-10">
+<div class="max-w-4xl mx-auto w-full">
+<!-- Status Badge -->
+<div class="flex items-center gap-2 mb-4">
+<span class="material-symbols-outlined text-status-confirmed text-[18px]" style="font-variation-settings: 'FILL' 1;">task_alt</span>
+<span class="font-label-caps text-label-caps text-status-confirmed uppercase tracking-widest">Diagnostic Complete</span>
+</div>
+<!-- Header Section -->
+<div class="mb-10">
+<h2 class="font-headline-lg text-headline-lg text-on-background mb-4">Root Cause Identified: D1 Serialization Conflict</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-2xl">
+                    Concurrent write operations exceeding the D1 sqlite_busy timeout.
+                </p>
+</div>
+<!-- Evidence / Telemetry Block -->
+<div class="border border-outline-variant bg-surface-container-low p-gutter mb-12 flex flex-col sm:flex-row items-start sm:items-center gap-4 relative overflow-hidden group">
+<!-- Subtle background mesh pattern to signify data processing -->
+<div class="absolute inset-0 opacity-[0.03] pointer-events-none" style="background-image: radial-gradient(circle at 2px 2px, theme('colors.primary') 1px, transparent 0); background-size: 16px 16px;"></div>
+<div class="w-10 h-10 rounded-full bg-status-confirmed/10 border border-status-confirmed/30 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-status-confirmed">policy</span>
+</div>
+<div>
+<h3 class="font-label-caps text-label-caps text-on-surface mb-1">Evidence Synthesized</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Confirmed by 12 reproductions on Cloudflare Workers Runtime.</p>
+</div>
+<div class="sm:ml-auto flex items-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+<span class="font-label-caps text-label-caps text-outline">View Trace</span>
+<span class="material-symbols-outlined text-[16px] text-outline">arrow_forward</span>
+</div>
+</div>
+<!-- Resolution / Recommended Fix Node -->
+<div class="border border-outline-variant bg-diagnostic-node-bg relative mb-12 shadow-[0_4px_24px_rgba(0,0,0,0.2)]">
+<!-- Active Node Indicator (Left border) -->
+<div class="absolute left-0 top-0 bottom-0 w-[2px] bg-secondary shadow-[0_0_8px_theme('colors.secondary')]"></div>
+<div class="p-margin border-b border-outline-variant/50">
+<div class="flex items-center gap-3 mb-4">
+<span class="material-symbols-outlined text-secondary text-[20px]">build_circle</span>
+<h3 class="font-headline-md text-headline-md text-on-surface">Recommended Fix</h3>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-0">
+                        Implement a retry loop with exponential backoff or use the <code class="font-code-block text-code-block px-1.5 py-0.5 bg-surface-container-lowest border border-outline-variant rounded-sm text-on-surface">--persist-to</code> flag for local dev.
+                    </p>
+</div>
+<!-- Code Block -->
+<div class="bg-surface-container-lowest">
+<div class="flex items-center justify-between px-gutter py-2 border-b border-outline-variant/30 bg-[#0A101C]">
+<span class="font-label-caps text-label-caps text-outline">TypeScript</span>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1.5" title="Copy code">
+<span class="material-symbols-outlined text-[14px]">content_copy</span>
+<span class="font-label-caps text-label-caps">Copy</span>
+</button>
+</div>
+<div class="p-gutter overflow-x-auto">
+<pre class="font-code-block text-code-block text-on-surface leading-relaxed whitespace-pre"><span class="syntax-keyword">const</span> <span class="syntax-function">executeWithRetry</span> <span class="syntax-punctuation">=</span> <span class="syntax-keyword">async</span> <span class="syntax-punctuation">(</span>db<span class="syntax-punctuation">,</span> query<span class="syntax-punctuation">,</span> retries <span class="syntax-punctuation">=</span> <span class="syntax-string">3</span><span class="syntax-punctuation">)</span> <span class="syntax-keyword">=&gt;</span> <span class="syntax-punctuation">{</span>
+  <span class="syntax-keyword">for</span> <span class="syntax-punctuation">(</span><span class="syntax-keyword">let</span> i <span class="syntax-punctuation">=</span> <span class="syntax-string">0</span><span class="syntax-punctuation">;</span> i <span class="syntax-punctuation">&lt;</span> retries<span class="syntax-punctuation">;</span> i<span class="syntax-punctuation">++</span><span class="syntax-punctuation">)</span> <span class="syntax-punctuation">{</span>
+    <span class="syntax-keyword">try</span> <span class="syntax-punctuation">{</span>
+      <span class="syntax-keyword">return</span> <span class="syntax-keyword">await</span> db<span class="syntax-punctuation">.</span><span class="syntax-function">prepare</span><span class="syntax-punctuation">(</span>query<span class="syntax-punctuation">)</span><span class="syntax-punctuation">.</span><span class="syntax-function">run</span><span class="syntax-punctuation">();</span>
+    <span class="syntax-punctuation">}</span> <span class="syntax-keyword">catch</span> <span class="syntax-punctuation">(</span>error<span class="syntax-punctuation">)</span> <span class="syntax-punctuation">{</span>
+      <span class="syntax-keyword">if</span> <span class="syntax-punctuation">(</span>error<span class="syntax-punctuation">.</span>message<span class="syntax-punctuation">.</span><span class="syntax-function">includes</span><span class="syntax-punctuation">(</span><span class="syntax-string">'SQLITE_BUSY'</span><span class="syntax-punctuation">))</span> <span class="syntax-punctuation">{</span>
+        <span class="syntax-keyword">const</span> backoff <span class="syntax-punctuation">=</span> Math<span class="syntax-punctuation">.</span><span class="syntax-function">pow</span><span class="syntax-punctuation">(</span><span class="syntax-string">2</span><span class="syntax-punctuation">,</span> i<span class="syntax-punctuation">)</span> <span class="syntax-punctuation">*</span> <span class="syntax-string">100</span><span class="syntax-punctuation">;</span>
+        <span class="syntax-comment">// Wait before retrying</span>
+        <span class="syntax-keyword">await</span> <span class="syntax-keyword">new</span> Promise<span class="syntax-punctuation">(</span>resolve <span class="syntax-keyword">=&gt;</span> <span class="syntax-function">setTimeout</span><span class="syntax-punctuation">(</span>resolve<span class="syntax-punctuation">,</span> backoff<span class="syntax-punctuation">));</span>
+        <span class="syntax-keyword">continue</span><span class="syntax-punctuation">;</span>
+      <span class="syntax-punctuation">}</span>
+      <span class="syntax-keyword">throw</span> error<span class="syntax-punctuation">;</span>
+    <span class="syntax-punctuation">}</span>
+  <span class="syntax-punctuation">}</span>
+  <span class="syntax-keyword">throw</span> <span class="syntax-keyword">new</span> Error<span class="syntax-punctuation">(</span><span class="syntax-string">'Max retries reached for D1 transaction'</span><span class="syntax-punctuation">);</span>
+<span class="syntax-punctuation">};</span>
+</pre>
+</div>
+</div>
+</div>
+<!-- Verification Step -->
+<div class="mb-12">
+<h4 class="font-label-caps text-label-caps text-outline mb-3 uppercase tracking-widest">Verification Step</h4>
+<div class="border border-outline-variant bg-surface-container-highest p-4 rounded-DEFAULT flex items-center justify-between group">
+<code class="font-code-block text-code-block text-on-surface">npx wrangler d1 execute db --file=./verify.sql</code>
+<button class="w-8 h-8 flex items-center justify-center rounded bg-surface-container border border-outline-variant hover:border-outline text-on-surface-variant hover:text-on-surface transition-colors" title="Run Command">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Feedback Loop -->
+<div class="border-t border-outline-variant pt-10">
+<h4 class="font-body-md text-body-md text-on-surface-variant mb-4 text-center sm:text-left">Did this solve the problem?</h4>
+<div class="flex flex-wrap gap-4 justify-center sm:justify-start">
+<!-- Worked Action (Green Accents) -->
+<button class="flex items-center gap-2 px-5 py-2.5 rounded-DEFAULT border border-status-ci-verified text-status-ci-verified bg-status-ci-verified/5 hover:bg-status-ci-verified/15 transition-colors font-body-sm text-body-sm font-medium">
+<span class="material-symbols-outlined text-[18px]">check</span>
+                        Worked
+                    </button>
+<!-- Partially Action -->
+<button class="flex items-center gap-2 px-5 py-2.5 rounded-DEFAULT border border-warning-amber text-warning-amber bg-warning-amber/5 hover:bg-warning-amber/15 transition-colors font-body-sm text-body-sm font-medium">
+<span class="material-symbols-outlined text-[18px]">thumbs_up_down</span>
+                        Partially
+                    </button>
+<!-- Didn't Work Action -->
+<button class="flex items-center gap-2 px-5 py-2.5 rounded-DEFAULT border border-outline-variant text-on-surface-variant hover:border-outline hover:text-on-surface bg-surface-container-low transition-colors font-body-sm text-body-sm font-medium">
+<span class="material-symbols-outlined text-[18px]">close</span>
+                        Didn't work
+                    </button>
+</div>
+</div>
+<!-- Post-Feedback Information (Environment Tags) -->
+<div class="mt-16 pt-6 border-t border-outline-variant/30 flex flex-col md:flex-row items-center justify-between gap-4">
+<span class="font-body-sm text-body-sm text-on-surface-variant italic">Your reproduction was recorded.</span>
+<div class="flex flex-wrap items-center gap-2">
+<!-- OS Tag (Blue) -->
+<div class="border border-evidence-blue/50 text-evidence-blue bg-evidence-blue/10 px-2 py-0.5 rounded-[2px] font-env-tag text-env-tag flex items-center gap-1.5" title="Operating System">
+<span class="material-symbols-outlined text-[12px]">terminal</span>
+                        Ubuntu 24.04
+                    </div>
+<!-- Runtime Tag (Teal) -->
+<div class="border border-technical-teal/50 text-technical-teal bg-technical-teal/10 px-2 py-0.5 rounded-[2px] font-env-tag text-env-tag flex items-center gap-1.5" title="Runtime">
+<span class="material-symbols-outlined text-[12px]">javascript</span>
+                        Node 24
+                    </div>
+<!-- Revision Tag (Indigo / Default outline variant here to not clash too much) -->
+<div class="border border-outline-variant text-on-surface-variant bg-surface-container-highest px-2 py-0.5 rounded-[2px] font-env-tag text-env-tag flex items-center gap-1.5" title="Revision">
+<span class="material-symbols-outlined text-[12px]">commit</span>
+                        Revision: v7
+                    </div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

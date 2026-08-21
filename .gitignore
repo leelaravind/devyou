@@ -1,0 +1,51 @@
+# ---------------------------------------------------------------------------
+# Secrets. These are listed first and deliberately: this file exists before the
+# repository does, so `git init` never sees an unignored credential.
+#
+#   .env   holds ANTHROPIC_API_KEY
+#   mcp    holds the Google Stitch MCP API key (X-Goog-Api-Key)
+#
+# Production and staging secrets live in Cloudflare Worker secrets, never here.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+mcp
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+*.pem
+*.key
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.react-router/
+.turbo/
+*.tsbuildinfo
+
+# Cloudflare
+.wrangler/
+worker-configuration.d.ts
+
+# Test / tooling output
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local scratch
+*.local
+tmp/

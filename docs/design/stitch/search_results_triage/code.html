@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ITISYOU - Search Results &amp; Triage</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Geist:wght@400;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Theme Configuration -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#adc6ff",
+                        "surface": "#0b1326",
+                        "technical-teal": "#0D9488",
+                        "surface-variant": "#2d3449",
+                        "secondary-fixed": "#89f5e7",
+                        "status-reproduced": "#F472B6",
+                        "outline": "#8c909f",
+                        "surface-container": "#171f33",
+                        "surface-container-highest": "#2d3449",
+                        "tertiary-fixed": "#ffdcc6",
+                        "error-container": "#93000a",
+                        "on-primary-container": "#00285d",
+                        "status-confirmed": "#818CF8",
+                        "tertiary-container": "#df7412",
+                        "on-tertiary-container": "#461f00",
+                        "surface-tint": "#adc6ff",
+                        "inverse-primary": "#005ac2",
+                        "background": "#0b1326",
+                        "on-secondary": "#003732",
+                        "tertiary": "#ffb786",
+                        "outline-variant": "#424754",
+                        "on-tertiary": "#502400",
+                        "destructive-red": "#EF4444",
+                        "status-ci-verified": "#34D399",
+                        "on-tertiary-fixed": "#311400",
+                        "on-secondary-container": "#00302b",
+                        "on-primary": "#002e6a",
+                        "inverse-surface": "#dae2fd",
+                        "evidence-blue": "#3B82F6",
+                        "primary": "#adc6ff",
+                        "diagnostic-node-bg": "#1E293B",
+                        "inverse-on-surface": "#283044",
+                        "warning-amber": "#F59E0B",
+                        "surface-container-high": "#222a3d",
+                        "secondary-container": "#29a195",
+                        "surface-bright": "#31394d",
+                        "on-surface-variant": "#c2c6d6",
+                        "on-surface": "#dae2fd",
+                        "primary-container": "#4d8eff",
+                        "on-background": "#dae2fd",
+                        "on-tertiary-fixed-variant": "#723600",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-container-low": "#131b2e",
+                        "tertiary-fixed-dim": "#ffb786",
+                        "on-error": "#690005",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed-variant": "#005049",
+                        "on-error-container": "#ffdad6",
+                        "status-documented": "#94A3B8",
+                        "on-primary-fixed-variant": "#004395",
+                        "surface-container-lowest": "#060e20",
+                        "secondary": "#6bd8cb",
+                        "surface-dim": "#0b1326",
+                        "secondary-fixed-dim": "#6bd8cb",
+                        "on-primary-fixed": "#001a42",
+                        "on-secondary-fixed": "#00201d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "density-high": "8px",
+                        "gutter": "16px",
+                        "margin": "24px",
+                        "density-compact": "4px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "code-block": ["JetBrains Mono"],
+                        "env-tag": ["JetBrains Mono"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "code-block": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "env-tag": ["12px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom scrollbar for analytical feel */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0b1326; }
+        ::-webkit-scrollbar-thumb { background: #2d3449; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #424754; }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md text-body-md h-screen w-full flex overflow-hidden selection:bg-evidence-blue selection:text-white">
+<!-- JSON SIDENAVBAR -->
+<aside class="hidden md:flex flex-col h-full w-[280px] py-margin bg-surface-container z-40 docked fixed left-0 top-0 border-r border-outline-variant dark:border-outline-variant">
+<!-- Header -->
+<div class="px-margin mb-8 flex items-center gap-3">
+<div class="w-10 h-10 rounded-DEFAULT bg-surface-container-highest border border-outline-variant flex items-center justify-center overflow-hidden shrink-0">
+<span class="material-symbols-outlined text-primary" style="font-variation-settings: 'FILL' 1;">terminal</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim text-sm leading-tight tracking-tight">Admin Shell</span>
+<span class="font-code-block text-code-block text-on-surface-variant text-[10px]">v2.4.0-stable</span>
+</div>
+</div>
+<!-- CTA -->
+<div class="px-margin mb-6">
+<button class="w-full flex items-center justify-center gap-2 bg-evidence-blue hover:bg-evidence-blue/90 text-white font-label-caps text-label-caps py-2 px-4 rounded-DEFAULT transition-colors">
+<span class="material-symbols-outlined text-sm">add</span>
+                New Playbook
+            </button>
+</div>
+<!-- Primary Nav -->
+<nav class="flex-1 flex flex-col gap-1 px-density-high">
+<!-- Environment -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined text-[18px]">settings_input_component</span>
+                Environment
+            </a>
+<!-- Diagnostics (ACTIVE STATE) -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT border-l-2 border-primary bg-surface-container-high text-primary font-bold transition-all translate-x-1 duration-150 font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined text-[18px]">account_tree</span>
+                Diagnostics
+            </a>
+<!-- Evidence -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined text-[18px]">verified_user</span>
+                Evidence
+            </a>
+<!-- History -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined text-[18px]">history</span>
+                History
+            </a>
+<!-- Settings -->
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined text-[18px]">tune</span>
+                Settings
+            </a>
+</nav>
+<!-- Footer Nav -->
+<div class="mt-auto flex flex-col gap-1 px-density-high pt-4 border-t border-outline-variant/50">
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined text-[18px]">description</span>
+                Docs
+            </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-DEFAULT text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined text-[18px]">help</span>
+                Support
+            </a>
+</div>
+</aside>
+<!-- Main Workspace -->
+<main class="flex-1 flex flex-col ml-[280px] h-full relative bg-background">
+<!-- JSON TOPNAVBAR -->
+<header class="flex justify-between items-center w-full px-margin h-16 z-50 bg-surface-container-low dark:bg-surface-container-low border-b border-outline-variant dark:border-outline-variant docked full-width top-0 sticky">
+<!-- Left Group: Brand & Search -->
+<div class="flex items-center gap-6 flex-1">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim shrink-0">ITISYOU</span>
+<!-- Search Bar (on_left) -->
+<div class="relative w-full max-w-2xl flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-on-surface-variant text-[18px]">search</span>
+<input class="w-full bg-surface-container-highest border border-outline-variant rounded-DEFAULT pl-10 pr-4 py-1.5 font-code-block text-code-block text-on-surface focus:outline-none focus:border-evidence-blue focus:ring-1 focus:ring-evidence-blue/50 transition-colors placeholder-on-surface-variant/50" type="text" value="Cloudflare Worker D1 SQLITE_BUSY concurrent writes"/>
+<button class="absolute right-3 p-1 rounded hover:bg-surface-container-low text-on-surface-variant transition-colors group" title="Clear search">
+<span class="material-symbols-outlined text-[16px] group-hover:text-on-surface">close</span>
+</button>
+</div>
+</div>
+<!-- Right Group: Nav Links & Trailing Icons -->
+<div class="flex items-center gap-6 ml-6 shrink-0">
+<nav class="flex items-center gap-4">
+<!-- Playbooks (Inactive) -->
+<a class="text-on-surface-variant font-medium hover:bg-surface-container-highest transition-colors font-label-caps text-label-caps px-2 py-1 rounded" href="#">Playbooks</a>
+<!-- Contribute (Inactive) -->
+<a class="text-on-surface-variant font-medium hover:bg-surface-container-highest transition-colors font-label-caps text-label-caps px-2 py-1 rounded" href="#">Contribute</a>
+</nav>
+<div class="flex items-center gap-2 border-l border-outline-variant pl-6">
+<button class="p-2 rounded-full hover:bg-surface-container-highest transition-colors text-primary dark:text-primary-fixed-dim flex items-center justify-center">
+<span class="material-symbols-outlined">hub</span>
+</button>
+<button class="p-2 rounded-full hover:bg-surface-container-highest transition-colors text-primary dark:text-primary-fixed-dim flex items-center justify-center">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Secondary Controls / Filters Bar -->
+<div class="w-full bg-surface-container flex items-center gap-3 px-margin py-3 border-b border-outline-variant z-30 shrink-0 overflow-x-auto no-scrollbar">
+<span class="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-1 shrink-0 mr-2">
+<span class="material-symbols-outlined text-[16px]">filter_list</span> Filters:
+            </span>
+<button class="flex items-center gap-2 px-3 py-1 bg-surface border border-outline-variant hover:border-outline rounded-DEFAULT font-body-sm text-body-sm text-on-surface transition-colors shrink-0">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Tech:</span>
+                Cloudflare
+                <span class="material-symbols-outlined text-[14px] text-on-surface-variant">expand_more</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1 bg-surface border border-outline-variant hover:border-outline rounded-DEFAULT font-body-sm text-body-sm text-on-surface transition-colors shrink-0">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Version:</span>
+<span class="font-code-block text-code-block text-evidence-blue">&gt;=3.0.0</span>
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">expand_more</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1 bg-surface border border-outline-variant hover:border-outline rounded-DEFAULT font-body-sm text-body-sm text-on-surface transition-colors shrink-0">
+<span class="font-label-caps text-label-caps text-on-surface-variant">OS:</span>
+                Any
+                <span class="material-symbols-outlined text-[14px] text-on-surface-variant">expand_more</span>
+</button>
+<button class="flex items-center gap-2 px-3 py-1 bg-status-ci-verified/10 border border-status-ci-verified/30 rounded-DEFAULT font-body-sm text-body-sm text-status-ci-verified transition-colors shrink-0">
+<span class="material-symbols-outlined text-[14px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+                CI Verified Only
+            </button>
+<div class="h-4 w-px bg-outline-variant mx-2 shrink-0"></div>
+<button class="flex items-center gap-2 px-3 py-1 bg-surface-container-high border border-outline-variant hover:border-evidence-blue rounded-DEFAULT font-body-sm text-body-sm text-on-surface transition-colors shrink-0 ml-auto">
+<span class="material-symbols-outlined text-[14px] text-evidence-blue">radar</span>
+                Auto-Match Env
+            </button>
+</div>
+<!-- Scrollable Results Canvas -->
+<div class="flex-1 overflow-y-auto p-margin pb-24 relative">
+<div class="max-w-5xl mx-auto flex flex-col gap-gutter">
+<div class="font-label-caps text-label-caps text-on-surface-variant mb-2">Showing 3 relevant diagnostic paths</div>
+<!-- Exact Match Card -->
+<div class="group bg-diagnostic-node-bg border border-outline-variant rounded-lg p-5 flex flex-col gap-4 relative overflow-hidden transition-all hover:bg-surface-container-high border-l-[3px] border-l-evidence-blue">
+<!-- Top Row: Title & Badge -->
+<div class="flex items-start justify-between gap-4">
+<div class="flex flex-col gap-1">
+<div class="flex items-center gap-3">
+<h3 class="font-headline-md text-headline-md text-on-surface text-lg group-hover:text-evidence-blue transition-colors cursor-pointer">D1 SQLITE_BUSY error on concurrent Worker requests</h3>
+<span class="bg-evidence-blue/10 border border-evidence-blue/30 text-evidence-blue px-2 py-0.5 rounded-DEFAULT font-label-caps text-label-caps flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">my_location</span> Exact Match
+                                </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Occurs when multiple worker instances attempt to write to the same D1 database simultaneously, exceeding the default busy_timeout.</p>
+</div>
+<button class="p-2 border border-outline-variant rounded-DEFAULT bg-surface hover:bg-surface-container text-on-surface-variant transition-colors shrink-0">
+<span class="material-symbols-outlined text-[20px]">play_arrow</span>
+</button>
+</div>
+<!-- Middle Row: Tech & Meta -->
+<div class="flex flex-wrap items-center gap-3">
+<div class="flex items-center gap-2 p-1.5 px-2 bg-surface-container border border-outline-variant rounded-DEFAULT">
+<span class="w-2 h-2 rounded-full bg-status-confirmed"></span>
+<span class="font-env-tag text-env-tag text-on-surface">Strong Match: Your OS + Runtime</span>
+</div>
+<!-- Tech Chips (Monospaced pills) -->
+<div class="flex items-center gap-1.5 border-l border-outline-variant pl-3">
+<span class="font-code-block text-code-block text-[11px] px-1.5 py-0.5 border border-primary/20 bg-primary/10 text-primary rounded-DEFAULT">Cloudflare</span>
+<span class="font-code-block text-code-block text-[11px] px-1.5 py-0.5 border border-technical-teal/20 bg-technical-teal/10 text-technical-teal">D1</span>
+<span class="font-code-block text-code-block text-[11px] px-1.5 py-0.5 border border-status-confirmed/20 bg-status-confirmed/10 text-status-confirmed">TypeScript</span>
+</div>
+<div class="flex items-center gap-4 ml-auto font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex items-center gap-1" title="18 reproductions in 4 environments">
+<span class="material-symbols-outlined text-[16px] text-status-reproduced">pest_control</span>
+                                18 repros
+                            </div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">update</span>
+                                Verified 2h ago
+                            </div>
+</div>
+</div>
+<!-- Bottom Row: Diagnostic Breakdown -->
+<div class="bg-surface border border-outline-variant/50 rounded p-3 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-evidence-blue text-[18px]">account_tree</span>
+<span class="font-body-sm text-body-sm text-on-surface">Diagnostic Path: 4 nodes</span>
+</div>
+<span class="text-outline-variant">|</span>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px]">timer</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Est. Triage: 5m</span>
+</div>
+</div>
+<div class="flex items-center gap-1">
+<!-- Visual representation of nodes -->
+<div class="w-4 h-1 rounded-full bg-status-ci-verified"></div>
+<div class="w-2 h-px bg-outline-variant"></div>
+<div class="w-4 h-1 rounded-full bg-status-ci-verified"></div>
+<div class="w-2 h-px bg-outline-variant"></div>
+<div class="w-4 h-1 rounded-full bg-warning-amber"></div>
+<div class="w-2 h-px bg-outline-variant"></div>
+<div class="w-4 h-1 rounded-full bg-outline-variant border border-outline border-dashed"></div>
+</div>
+</div>
+</div>
+<!-- Related Result Card 1 -->
+<div class="group bg-diagnostic-node-bg border border-outline-variant rounded-lg p-5 flex flex-col gap-4 relative overflow-hidden transition-all hover:bg-surface-container-high border-l-[3px] border-l-transparent hover:border-l-outline-variant">
+<div class="flex items-start justify-between gap-4">
+<div class="flex flex-col gap-1">
+<h3 class="font-headline-md text-headline-md text-on-surface text-lg group-hover:text-primary transition-colors cursor-pointer">Database locked errors during high-concurrency batch writes</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Generic SQLite locking issues observed in edge environments under sudden load spikes.</p>
+</div>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<div class="flex items-center gap-2 p-1.5 px-2 bg-surface-container border border-outline-variant rounded-DEFAULT opacity-70">
+<span class="w-2 h-2 rounded-full bg-warning-amber"></span>
+<span class="font-env-tag text-env-tag text-on-surface">Partial Match: Runtime only</span>
+</div>
+<div class="flex items-center gap-1.5 border-l border-outline-variant pl-3 opacity-80">
+<span class="font-code-block text-code-block text-[11px] px-1.5 py-0.5 border border-primary/20 bg-primary/5 text-primary rounded-DEFAULT">Cloudflare</span>
+<span class="font-code-block text-code-block text-[11px] px-1.5 py-0.5 border border-outline/20 bg-outline/10 text-outline">Workers</span>
+</div>
+<div class="flex items-center gap-4 ml-auto font-body-sm text-body-sm text-on-surface-variant opacity-80">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-status-documented">menu_book</span>
+                                Documented
+                            </div>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">update</span>
+                                Verified 3d ago
+                            </div>
+</div>
+</div>
+</div>
+<!-- Related Result Card 2 -->
+<div class="group bg-diagnostic-node-bg border border-outline-variant rounded-lg p-5 flex flex-col gap-4 relative overflow-hidden transition-all hover:bg-surface-container-high border-l-[3px] border-l-transparent hover:border-l-outline-variant">
+<div class="flex items-start justify-between gap-4">
+<div class="flex flex-col gap-1">
+<h3 class="font-headline-md text-headline-md text-on-surface text-lg group-hover:text-primary transition-colors cursor-pointer">Optimal busy_timeout configuration for edge databases</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Playbook for tuning PRAGMA busy_timeout when deploying SQLite derivatives on V8 isolates.</p>
+</div>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<div class="flex items-center gap-2 p-1.5 px-2 bg-surface-container border border-outline-variant rounded-DEFAULT opacity-70">
+<span class="w-2 h-2 rounded-full bg-outline-variant"></span>
+<span class="font-env-tag text-env-tag text-on-surface-variant">Contextual Match</span>
+</div>
+<div class="flex items-center gap-1.5 border-l border-outline-variant pl-3 opacity-80">
+<span class="font-code-block text-code-block text-[11px] px-1.5 py-0.5 border border-technical-teal/20 bg-technical-teal/5 text-technical-teal rounded-DEFAULT">SQLite</span>
+<span class="font-code-block text-code-block text-[11px] px-1.5 py-0.5 border border-outline/20 bg-outline/10 text-outline">Architecture</span>
+</div>
+<div class="flex items-center gap-4 ml-auto font-body-sm text-body-sm text-on-surface-variant opacity-80">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+                                1.2k views
+                            </div>
+</div>
+</div>
+</div>
+<!-- Zero Results / Contribute CTA State -->
+<div class="mt-8 relative w-full border border-dashed border-outline-variant rounded-lg bg-surface-container-low/50 p-10 flex flex-col items-center justify-center text-center gap-4 transition-all hover:bg-surface-container-low hover:border-outline">
+<div class="w-12 h-12 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-on-surface-variant text-[24px]">troubleshoot</span>
+</div>
+<h4 class="font-headline-md text-headline-md text-on-surface">Didn't find your exact scenario?</h4>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-lg">
+                        The registry relies on the community mapping edge cases. If you resolve this SQLITE_BUSY error, document your diagnostic path to help the next developer.
+                    </p>
+<button class="mt-2 flex items-center gap-2 bg-surface-container-highest hover:bg-surface-bright border border-outline-variant text-on-surface font-label-caps text-label-caps py-2.5 px-6 rounded-DEFAULT transition-colors">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+                        Contribute this problem
+                    </button>
+</div>
+</div>
+</div>
+</main>
+</body></html>

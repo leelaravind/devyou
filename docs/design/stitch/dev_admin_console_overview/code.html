@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Admin Console: Dev Product Module Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=Inter:wght@400;500&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#adc6ff",
+                        "surface": "#0b1326",
+                        "technical-teal": "#0D9488",
+                        "surface-variant": "#2d3449",
+                        "secondary-fixed": "#89f5e7",
+                        "status-reproduced": "#F472B6",
+                        "outline": "#8c909f",
+                        "surface-container": "#171f33",
+                        "surface-container-highest": "#2d3449",
+                        "tertiary-fixed": "#ffdcc6",
+                        "error-container": "#93000a",
+                        "on-primary-container": "#00285d",
+                        "status-confirmed": "#818CF8",
+                        "tertiary-container": "#df7412",
+                        "on-tertiary-container": "#461f00",
+                        "surface-tint": "#adc6ff",
+                        "inverse-primary": "#005ac2",
+                        "background": "#0b1326",
+                        "on-secondary": "#003732",
+                        "tertiary": "#ffb786",
+                        "outline-variant": "#424754",
+                        "on-tertiary": "#502400",
+                        "destructive-red": "#EF4444",
+                        "status-ci-verified": "#34D399",
+                        "on-tertiary-fixed": "#311400",
+                        "on-secondary-container": "#00302b",
+                        "on-primary": "#002e6a",
+                        "inverse-surface": "#dae2fd",
+                        "evidence-blue": "#3B82F6",
+                        "primary": "#adc6ff",
+                        "diagnostic-node-bg": "#1E293B",
+                        "inverse-on-surface": "#283044",
+                        "warning-amber": "#F59E0B",
+                        "surface-container-high": "#222a3d",
+                        "secondary-container": "#29a195",
+                        "surface-bright": "#31394d",
+                        "on-surface-variant": "#c2c6d6",
+                        "on-surface": "#dae2fd",
+                        "primary-container": "#4d8eff",
+                        "on-background": "#dae2fd",
+                        "on-tertiary-fixed-variant": "#723600",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-container-low": "#131b2e",
+                        "tertiary-fixed-dim": "#ffb786",
+                        "on-error": "#690005",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed-variant": "#005049",
+                        "on-error-container": "#ffdad6",
+                        "status-documented": "#94A3B8",
+                        "on-primary-fixed-variant": "#004395",
+                        "surface-container-lowest": "#060e20",
+                        "secondary": "#6bd8cb",
+                        "surface-dim": "#0b1326",
+                        "secondary-fixed-dim": "#6bd8cb",
+                        "on-primary-fixed": "#001a42",
+                        "on-secondary-fixed": "#00201d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "density-high": "8px",
+                        "gutter": "16px",
+                        "margin": "24px",
+                        "density-compact": "4px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "code-block": ["JetBrains Mono"],
+                        "env-tag": ["JetBrains Mono"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "code-block": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "env-tag": ["12px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Custom scrollbar for deep slate technical feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0b1326; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2d3449; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #424754; 
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen overflow-hidden flex flex-col antialiased selection:bg-evidence-blue selection:text-white">
+<!-- TopNavBar (Generated from JSON) -->
+<header class="bg-surface-container-low dark:bg-surface-container-low border-b border-outline-variant dark:border-outline-variant flex justify-between items-center w-full px-margin h-16 z-50 shrink-0">
+<div class="flex items-center gap-gutter">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">ITISYOU</span>
+<nav class="hidden md:flex gap-margin ml-gutter h-full items-center">
+<a class="text-on-surface-variant font-medium hover:bg-surface-container-highest transition-colors px-density-high py-density-compact rounded" href="#">Playbooks</a>
+<a class="text-on-surface-variant font-medium hover:bg-surface-container-highest transition-colors px-density-high py-density-compact rounded" href="#">Contribute</a>
+<span class="text-primary border-b-2 border-primary font-bold h-full flex items-center px-density-high">Admin Console</span>
+</nav>
+</div>
+<div class="flex items-center gap-gutter text-primary dark:text-primary-fixed-dim">
+<div class="relative hidden md:block">
+<span class="material-symbols-outlined absolute left-density-high top-1/2 -translate-y-1/2 text-on-surface-variant text-[20px]" data-icon="search">search</span>
+<input class="bg-surface-container border border-outline-variant rounded pl-8 pr-density-high py-density-compact text-body-sm font-body-sm w-64 focus:border-evidence-blue focus:ring-1 focus:ring-evidence-blue outline-none transition-colors" placeholder="Global search..." type="text"/>
+</div>
+<button aria-label="hub" class="p-density-high hover:bg-surface-container-highest transition-colors rounded-full">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+</button>
+<button aria-label="account" class="p-density-high hover:bg-surface-container-highest transition-colors rounded-full">
+<img alt="User profile" class="w-8 h-8 rounded-full border border-outline-variant object-cover" data-alt="A small, circular avatar portrait of an administrator profile in a technical, minimalist dashboard setting, lit with high key blue tones." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAff61RwieWt5xeRL4GLsTuq4U7PPhcTAB9eysozMzRtikmdFKYsigADUoLNUoJYP3UJ7uPNQg15QpKNsnahBYrH9XVF6OaIGXvzuNG1I4suk-qEGRJnexTd_b2DQKFgdDKqptKBARqT0EZW-Y-DD-LuR3uC6UwcWIjCbsNTHykEYyZ7NRuNwfvWaoBgyW_pO5BGqurJ3BYHAiwXXomZ2UYAaMA2Kac3BntyuhEpdcxFxb0AiGVuORp8Q"/>
+</button>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar (Generated from JSON) -->
+<aside class="hidden md:flex flex-col h-full w-[280px] py-margin bg-surface-container z-40 border-r border-outline-variant dark:border-outline-variant shrink-0">
+<div class="px-margin mb-margin">
+<div class="flex items-center gap-density-high mb-gutter">
+<img alt="System Status" class="w-10 h-10 rounded border border-outline-variant object-cover bg-diagnostic-node-bg" data-alt="A stylized, glowing teal technical icon representing system health and status, set against a dark slate background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAVaG5aAZ0p_Yhhm1KJ1e0-hIM0Ety6wSWUxMxQdphcgpEybSSYZqOCU-OhFF7ZEOlKcc1o2C2FLsusGcymQ7sU4GjizSJn6TEZCQT2lnZqeRCZTozDFJbKpacEO0bjMz7jC5Z1EW3wOOgvlabKK_kisxo8wJXYFlm6Z_2y8krhkx5_bkJemjMkAfD4smdksfq3l8zoKvh6DqXqc-2FJN2AifupIefF9QxzHTNJp6H9PIhJnnIUFyDU1g"/>
+<div>
+<h2 class="font-headline-md text-headline-md text-primary text-[18px] leading-tight">Admin Shell</h2>
+<span class="font-label-caps text-label-caps text-on-surface-variant">v2.4.0-stable</span>
+</div>
+</div>
+<button class="w-full bg-primary-container text-on-primary-container font-label-caps text-label-caps py-density-high rounded hover:bg-primary transition-colors border border-transparent">
+                    New Playbook
+                </button>
+</div>
+<nav class="flex-1 overflow-y-auto px-density-high space-y-unit">
+<a class="flex items-center gap-density-high px-gutter py-density-high rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings_input_component">settings_input_component</span>
+<span class="font-label-caps text-label-caps">Environment</span>
+</a>
+<a class="flex items-center gap-density-high px-gutter py-density-high rounded border-l-2 border-primary bg-surface-container-high text-primary font-bold" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="account_tree">account_tree</span>
+<span class="font-label-caps text-label-caps">Diagnostics</span>
+</a>
+<a class="flex items-center gap-density-high px-gutter py-density-high rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="verified_user">verified_user</span>
+<span class="font-label-caps text-label-caps">Evidence</span>
+</a>
+<a class="flex items-center gap-density-high px-gutter py-density-high rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="history">history</span>
+<span class="font-label-caps text-label-caps">History</span>
+</a>
+<a class="flex items-center gap-density-high px-gutter py-density-high rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="tune">tune</span>
+<span class="font-label-caps text-label-caps">Settings</span>
+</a>
+</nav>
+<div class="mt-auto px-density-high pt-margin border-t border-outline-variant space-y-unit">
+<a class="flex items-center gap-density-high px-gutter py-density-high rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="description">description</span>
+<span class="font-label-caps text-label-caps">Docs</span>
+</a>
+<a class="flex items-center gap-density-high px-gutter py-density-high rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="help">help</span>
+<span class="font-label-caps text-label-caps">Support</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto p-margin bg-background">
+<div class="max-w-[1400px] mx-auto space-y-margin">
+<!-- Page Header -->
+<div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface flex items-center gap-density-high">
+<span class="material-symbols-outlined text-[32px] text-technical-teal" data-icon="developer_board">developer_board</span>
+                        Dev Module Overview
+                    </h1>
+<p class="font-body-md text-body-md text-on-surface-variant mt-unit">Monitor knowledge health, verify contributions, and analyze diagnostic telemetry.</p>
+</div>
+<!-- Stats Grid (Bento Style) -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-gutter">
+<!-- Stat 1 -->
+<div class="bg-diagnostic-node-bg border border-outline-variant rounded p-gutter relative overflow-hidden group hover:border-evidence-blue transition-colors">
+<div class="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent pointer-events-none"></div>
+<div class="flex justify-between items-start mb-margin">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Published Playbooks</span>
+<span class="material-symbols-outlined text-technical-teal" data-icon="library_books">library_books</span>
+</div>
+<div class="font-headline-lg text-headline-lg text-on-surface">1,248</div>
+<div class="font-body-sm text-body-sm text-status-ci-verified mt-unit flex items-center gap-unit">
+<span class="material-symbols-outlined text-[14px]" data-icon="trending_up">trending_up</span> +12 this week
+                        </div>
+</div>
+<!-- Stat 2 -->
+<div class="bg-diagnostic-node-bg border border-outline-variant rounded p-gutter relative overflow-hidden group hover:border-warning-amber transition-colors">
+<div class="absolute inset-0 bg-gradient-to-br from-warning-amber/5 to-transparent pointer-events-none"></div>
+<div class="flex justify-between items-start mb-margin">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Pending Review</span>
+<span class="material-symbols-outlined text-warning-amber" data-icon="pending_actions">pending_actions</span>
+</div>
+<div class="font-headline-lg text-headline-lg text-on-surface">34</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-unit flex items-center gap-unit">
+<span class="material-symbols-outlined text-[14px]" data-icon="schedule">schedule</span> 5 critical priority
+                        </div>
+</div>
+<!-- Stat 3 -->
+<div class="bg-diagnostic-node-bg border border-outline-variant rounded p-gutter relative overflow-hidden group hover:border-destructive-red transition-colors">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-destructive-red"></div>
+<div class="flex justify-between items-start mb-margin pl-density-high">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Safety Reports</span>
+<span class="material-symbols-outlined text-destructive-red" data-icon="gavel">gavel</span>
+</div>
+<div class="font-headline-lg text-headline-lg text-on-surface pl-density-high">3</div>
+<div class="font-body-sm text-body-sm text-destructive-red mt-unit flex items-center gap-unit pl-density-high">
+<span class="material-symbols-outlined text-[14px]" data-icon="warning">warning</span> Action required
+                        </div>
+</div>
+<!-- Stat 4 -->
+<div class="bg-diagnostic-node-bg border border-outline-variant rounded p-gutter relative overflow-hidden group hover:border-status-documented transition-colors">
+<div class="flex justify-between items-start mb-margin">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Stale Knowledge</span>
+<span class="material-symbols-outlined text-status-documented" data-icon="delete_sweep">delete_sweep</span>
+</div>
+<div class="font-headline-lg text-headline-lg text-on-surface">89</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-unit flex items-center gap-unit">
+<span class="material-symbols-outlined text-[14px]" data-icon="info">info</span> Unverified &gt; 90 days
+                        </div>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-margin">
+<!-- Left Column: Queue & Search Quality (Span 2) -->
+<div class="lg:col-span-2 space-y-margin">
+<!-- Priority Queue -->
+<section class="bg-surface-container rounded border border-outline-variant flex flex-col">
+<div class="p-gutter border-b border-outline-variant flex justify-between items-center bg-surface-container-low rounded-t">
+<h3 class="font-headline-md text-headline-md text-on-surface text-[16px]">Pending Verification Review</h3>
+<button class="font-label-caps text-label-caps text-primary hover:text-primary-fixed-dim transition-colors flex items-center gap-unit">
+                                    View All <span class="material-symbols-outlined text-[16px]" data-icon="arrow_forward">arrow_forward</span>
+</button>
+</div>
+<div class="divide-y divide-outline-variant">
+<!-- Queue Item -->
+<div class="p-gutter hover:bg-surface-container-highest transition-colors flex items-center justify-between group cursor-pointer border-l-2 border-transparent hover:border-evidence-blue">
+<div class="flex-1">
+<div class="flex items-center gap-density-high mb-unit">
+<span class="font-env-tag text-env-tag text-inverse-surface bg-inverse-primary/20 px-2 py-0.5 rounded border border-inverse-primary/30">React.js</span>
+<span class="font-env-tag text-env-tag text-technical-teal bg-technical-teal/10 px-2 py-0.5 rounded border border-technical-teal/30">Hooks</span>
+</div>
+<h4 class="font-body-md text-body-md text-on-surface font-medium">useEffect infinite loop on dependency array object mutation</h4>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-1 flex items-center gap-gutter">
+<span class="flex items-center gap-unit"><span class="material-symbols-outlined text-[14px]" data-icon="person">person</span> @dev_jane</span>
+<span class="flex items-center gap-unit"><span class="material-symbols-outlined text-[14px]" data-icon="schedule">schedule</span> 2h ago</span>
+</div>
+</div>
+<div class="flex items-center gap-density-high opacity-0 group-hover:opacity-100 transition-opacity">
+<button aria-label="Review" class="bg-surface-container-low border border-outline-variant p-density-high rounded hover:bg-surface-bright text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]" data-icon="rate_review">rate_review</span>
+</button>
+<button aria-label="Approve" class="bg-evidence-blue/10 border border-evidence-blue/30 text-evidence-blue p-density-high rounded hover:bg-evidence-blue/20">
+<span class="material-symbols-outlined text-[20px]" data-icon="check_circle">check_circle</span>
+</button>
+</div>
+</div>
+<!-- Queue Item -->
+<div class="p-gutter hover:bg-surface-container-highest transition-colors flex items-center justify-between group cursor-pointer border-l-2 border-transparent hover:border-evidence-blue">
+<div class="flex-1">
+<div class="flex items-center gap-density-high mb-unit">
+<span class="font-env-tag text-env-tag text-status-confirmed bg-status-confirmed/10 px-2 py-0.5 rounded border border-status-confirmed/30">Docker</span>
+<span class="font-env-tag text-env-tag text-tertiary bg-tertiary/10 px-2 py-0.5 rounded border border-tertiary/30">Network</span>
+</div>
+<h4 class="font-body-md text-body-md text-on-surface font-medium">Container DNS resolution fails intermittently on Mac M1</h4>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-1 flex items-center gap-gutter">
+<span class="flex items-center gap-unit"><span class="material-symbols-outlined text-[14px]" data-icon="person">person</span> @sysadmin_bob</span>
+<span class="flex items-center gap-unit text-warning-amber"><span class="material-symbols-outlined text-[14px]" data-icon="schedule">schedule</span> 14h ago</span>
+</div>
+</div>
+<div class="flex items-center gap-density-high opacity-0 group-hover:opacity-100 transition-opacity">
+<button aria-label="Review" class="bg-surface-container-low border border-outline-variant p-density-high rounded hover:bg-surface-bright text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px]" data-icon="rate_review">rate_review</span>
+</button>
+<button aria-label="Approve" class="bg-evidence-blue/10 border border-evidence-blue/30 text-evidence-blue p-density-high rounded hover:bg-evidence-blue/20">
+<span class="material-symbols-outlined text-[20px]" data-icon="check_circle">check_circle</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- Search Quality -->
+<section class="bg-surface-container rounded border border-outline-variant">
+<div class="p-gutter border-b border-outline-variant flex justify-between items-center bg-surface-container-low rounded-t">
+<h3 class="font-headline-md text-headline-md text-on-surface text-[16px] flex items-center gap-density-high">
+<span class="material-symbols-outlined text-status-documented" data-icon="manage_search">manage_search</span> Search Quality: Zero-Result Queries
+                                </h3>
+</div>
+<div class="p-gutter">
+<div class="font-code-block text-code-block bg-diagnostic-node-bg border border-outline-variant rounded p-gutter space-y-density-high text-on-surface-variant">
+<div class="flex justify-between items-center border-b border-outline-variant pb-unit border-dashed">
+<span class="text-tertiary-fixed-dim">"nextjs 14 server action form state hydration mismatch"</span>
+<span class="bg-surface-container-highest px-2 py-0.5 rounded text-[11px]">42 searches</span>
+</div>
+<div class="flex justify-between items-center border-b border-outline-variant pb-unit border-dashed">
+<span class="text-tertiary-fixed-dim">"postgres connection pool exhaust prisma lambda"</span>
+<span class="bg-surface-container-highest px-2 py-0.5 rounded text-[11px]">28 searches</span>
+</div>
+<div class="flex justify-between items-center border-b border-outline-variant pb-unit border-dashed">
+<span class="text-tertiary-fixed-dim">"k8s pod stuck terminating finalizer"</span>
+<span class="bg-surface-container-highest px-2 py-0.5 rounded text-[11px]">19 searches</span>
+</div>
+</div>
+<button class="mt-gutter w-full bg-surface-container-highest border border-outline-variant text-on-surface font-label-caps text-label-caps py-density-high rounded hover:bg-surface-bright transition-colors flex items-center justify-center gap-density-high">
+<span class="material-symbols-outlined text-[16px]" data-icon="add">add</span> Generate Playbook Prompts
+                                </button>
+</div>
+</section>
+</div>
+<!-- Right Column: Inspector & Actions (Span 1) -->
+<div class="space-y-margin">
+<!-- Knowledge Inspector Mini -->
+<section class="bg-surface-container rounded border border-outline-variant">
+<div class="p-gutter border-b border-outline-variant bg-surface-container-low rounded-t">
+<h3 class="font-headline-md text-headline-md text-on-surface text-[16px] flex items-center gap-density-high">
+<span class="material-symbols-outlined text-evidence-blue" data-icon="troubleshoot">troubleshoot</span> Knowledge Inspector
+                                </h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-unit">Graph relationship query tool.</p>
+</div>
+<div class="p-gutter space-y-gutter">
+<div>
+<label class="font-label-caps text-label-caps text-on-surface-variant block mb-unit">Query Node ID</label>
+<input class="w-full bg-diagnostic-node-bg border border-outline-variant rounded px-density-high py-density-compact text-code-block font-code-block focus:border-evidence-blue focus:ring-1 focus:ring-evidence-blue outline-none transition-colors" placeholder="e.g. node_a8f92..." type="text"/>
+</div>
+<div class="grid grid-cols-3 gap-density-compact font-label-caps text-label-caps">
+<button class="bg-surface-container-highest border border-outline-variant py-unit rounded text-center hover:border-evidence-blue transition-colors">Problem</button>
+<button class="bg-evidence-blue/10 border border-evidence-blue text-evidence-blue py-unit rounded text-center">Test</button>
+<button class="bg-surface-container-highest border border-outline-variant py-unit rounded text-center hover:border-evidence-blue transition-colors">Evidence</button>
+</div>
+<div class="bg-surface-container-low border border-outline-variant rounded p-gutter h-32 flex items-center justify-center text-on-surface-variant font-body-sm italic">
+                                    Enter a node ID to visualize mapping...
+                                </div>
+</div>
+</section>
+<!-- Quick Operations -->
+<section class="bg-diagnostic-node-bg rounded border border-outline-variant p-gutter">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant mb-gutter">Operations Menu</h3>
+<div class="space-y-unit">
+<button class="w-full flex items-center gap-density-high p-density-high rounded text-on-surface hover:bg-surface-container-highest transition-colors text-left border border-transparent hover:border-outline-variant">
+<span class="material-symbols-outlined text-[18px] text-technical-teal" data-icon="account_tree">account_tree</span>
+<span class="font-body-sm text-body-sm">Technology Taxonomy</span>
+</button>
+<button class="w-full flex items-center gap-density-high p-density-high rounded text-on-surface hover:bg-surface-container-highest transition-colors text-left border border-transparent hover:border-outline-variant">
+<span class="material-symbols-outlined text-[18px] text-primary" data-icon="groups">groups</span>
+<span class="font-body-sm text-body-sm">Contributor Management</span>
+</button>
+<button class="w-full flex items-center gap-density-high p-density-high rounded text-destructive-red hover:bg-destructive-red/10 transition-colors text-left border border-transparent hover:border-destructive-red/30">
+<span class="material-symbols-outlined text-[18px]" data-icon="policy">policy</span>
+<span class="font-body-sm text-body-sm">Abuse &amp; Safety Controls</span>
+</button>
+</div>
+</section>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

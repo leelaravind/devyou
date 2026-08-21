@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Contribution — AI Structure Review</title>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Theme Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed-dim": "#adc6ff",
+                    "surface": "#0b1326",
+                    "technical-teal": "#0D9488",
+                    "surface-variant": "#2d3449",
+                    "secondary-fixed": "#89f5e7",
+                    "status-reproduced": "#F472B6",
+                    "outline": "#8c909f",
+                    "surface-container": "#171f33",
+                    "surface-container-highest": "#2d3449",
+                    "tertiary-fixed": "#ffdcc6",
+                    "error-container": "#93000a",
+                    "on-primary-container": "#00285d",
+                    "status-confirmed": "#818CF8",
+                    "tertiary-container": "#df7412",
+                    "on-tertiary-container": "#461f00",
+                    "surface-tint": "#adc6ff",
+                    "inverse-primary": "#005ac2",
+                    "background": "#0b1326",
+                    "on-secondary": "#003732",
+                    "tertiary": "#ffb786",
+                    "outline-variant": "#424754",
+                    "on-tertiary": "#502400",
+                    "destructive-red": "#EF4444",
+                    "status-ci-verified": "#34D399",
+                    "on-tertiary-fixed": "#311400",
+                    "on-secondary-container": "#00302b",
+                    "on-primary": "#002e6a",
+                    "inverse-surface": "#dae2fd",
+                    "evidence-blue": "#3B82F6",
+                    "primary": "#adc6ff",
+                    "diagnostic-node-bg": "#1E293B",
+                    "inverse-on-surface": "#283044",
+                    "warning-amber": "#F59E0B",
+                    "surface-container-high": "#222a3d",
+                    "secondary-container": "#29a195",
+                    "surface-bright": "#31394d",
+                    "on-surface-variant": "#c2c6d6",
+                    "on-surface": "#dae2fd",
+                    "primary-container": "#4d8eff",
+                    "on-background": "#dae2fd",
+                    "on-tertiary-fixed-variant": "#723600",
+                    "primary-fixed": "#d8e2ff",
+                    "surface-container-low": "#131b2e",
+                    "tertiary-fixed-dim": "#ffb786",
+                    "on-error": "#690005",
+                    "error": "#ffb4ab",
+                    "on-secondary-fixed-variant": "#005049",
+                    "on-error-container": "#ffdad6",
+                    "status-documented": "#94A3B8",
+                    "on-primary-fixed-variant": "#004395",
+                    "surface-container-lowest": "#060e20",
+                    "secondary": "#6bd8cb",
+                    "surface-dim": "#0b1326",
+                    "secondary-fixed-dim": "#6bd8cb",
+                    "on-primary-fixed": "#001a42",
+                    "on-secondary-fixed": "#00201d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "density-high": "8px",
+                    "gutter": "16px",
+                    "margin": "24px",
+                    "density-compact": "4px",
+                    "unit": "4px"
+            },
+            "fontFamily": {
+                    "headline-md": [
+                            "Geist"
+                    ],
+                    "headline-lg": [
+                            "Geist"
+                    ],
+                    "label-caps": [
+                            "JetBrains Mono"
+                    ],
+                    "body-sm": [
+                            "Inter"
+                    ],
+                    "code-block": [
+                            "JetBrains Mono"
+                    ],
+                    "env-tag": [
+                            "JetBrains Mono"
+                    ],
+                    "body-md": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "headline-lg": [
+                            "30px",
+                            {
+                                    "lineHeight": "36px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "label-caps": [
+                            "11px",
+                            {
+                                    "lineHeight": "16px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "body-sm": [
+                            "13px",
+                            {
+                                    "lineHeight": "18px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "code-block": [
+                            "13px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "env-tag": [
+                            "12px",
+                            {
+                                    "lineHeight": "14px",
+                                    "fontWeight": "500"
+                            }
+                    ],
+                    "body-md": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "fontWeight": "400"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[style*="'FILL' 1"] {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Custom scrollbar for raw text area */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(45, 52, 73, 0.5); /* surface-variant */
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #424754; /* outline-variant */
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #8c909f; /* outline */
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+<!-- TopNavBar -->
+<nav class="bg-surface-container-low dark:bg-surface-container-low border-b border-outline-variant dark:border-outline-variant docked full-width top-0 flex justify-between items-center w-full px-margin h-16 z-50">
+<div class="flex items-center gap-6">
+<span class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">ITISYOU</span>
+<div class="hidden md:flex gap-6 items-center">
+<a class="text-on-surface-variant font-medium hover:bg-surface-container-highest transition-colors px-2 py-1 rounded" href="#">Playbooks</a>
+<a class="text-primary border-b-2 border-primary font-bold hover:bg-surface-container-highest transition-colors px-2 py-1 rounded opacity-80 scale-95 transition-all" href="#">Contribute</a>
+</div>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-primary dark:text-primary-fixed-dim hover:bg-surface-container-highest p-2 rounded transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+</button>
+<button class="text-primary dark:text-primary-fixed-dim hover:bg-surface-container-highest p-2 rounded transition-colors flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="account_circle">account_circle</span>
+</button>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Left Nav placeholder to maintain structure, hidden on small screens -->
+<aside class="hidden xl:flex flex-col h-full w-[64px] py-margin bg-surface-container z-40 border-r border-outline-variant shrink-0 items-center gap-4">
+<!-- Icon only sidebar for extra space -->
+<button class="text-on-surface-variant hover:text-on-surface p-2 rounded"><span class="material-symbols-outlined">edit_note</span></button>
+<button class="text-primary bg-surface-container-high rounded p-2 border-l-2 border-primary"><span class="material-symbols-outlined">auto_fix_high</span></button>
+<button class="text-on-surface-variant hover:text-on-surface p-2 rounded"><span class="material-symbols-outlined">preview</span></button>
+</aside>
+<!-- Canvas -->
+<main class="flex-1 flex flex-col overflow-hidden bg-background">
+<!-- Header -->
+<header class="px-margin py-6 border-b border-outline-variant shrink-0 flex justify-between items-end bg-surface-container-lowest">
+<div>
+<div class="flex items-center gap-2 mb-2">
+<span class="font-label-caps text-label-caps text-evidence-blue bg-surface-container px-2 py-1 rounded border border-outline-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">auto_awesome</span>
+                            AI ASSISTED
+                        </span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Step 2 of 3</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Structure Review</h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1 max-w-2xl">
+                        AI has structured your raw notes into a diagnostic playbook. Review carefully. AI does not verify technical correctness.
+                    </p>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 rounded border border-outline-variant text-on-surface-variant hover:bg-surface-container-highest transition-colors font-body-sm text-body-sm font-medium">
+                        Save Draft
+                    </button>
+<button class="px-4 py-2 rounded bg-primary-container text-on-primary-container hover:bg-primary transition-colors font-body-sm text-body-sm font-medium flex items-center gap-2">
+<span>Publish Playbook</span>
+<span class="material-symbols-outlined text-[18px]">publish</span>
+</button>
+</div>
+</header>
+<!-- Workspace -->
+<div class="flex-1 flex flex-col lg:flex-row overflow-hidden">
+<!-- Left Pane: Original -->
+<div class="flex-1 flex flex-col border-r border-outline-variant bg-surface-dim">
+<div class="p-4 border-b border-outline-variant bg-surface-container-lowest flex items-center justify-between">
+<h2 class="font-body-md text-body-md font-medium text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-outline">description</span>
+                            Your Original Submission
+                        </h2>
+</div>
+<div class="flex-1 p-6 overflow-y-auto custom-scrollbar">
+<div class="font-code-block text-code-block text-on-surface-variant whitespace-pre-wrap bg-diagnostic-node-bg p-4 rounded border border-outline-variant">User reported 502 errors when hitting the payment gateway.
+Checked the pod logs in production namespace.
+Found: "connection refused" to redis-cache.
+Turns out the redis connection pool limit was reached.
+Restarted the payment pod and increased pool size to 100.
+Fixed it.
+
+Environment:
+- EKS 1.28
+- Redis 7
+- Go 1.21 microservice</div>
+</div>
+</div>
+<!-- Right Pane: Structured Review -->
+<div class="flex-1 flex flex-col bg-background">
+<div class="p-4 border-b border-outline-variant bg-surface-container-lowest flex items-center justify-between">
+<h2 class="font-body-md text-body-md font-medium text-on-surface flex items-center gap-2">
+<span class="material-symbols-outlined text-evidence-blue">auto_fix_high</span>
+                            Structured Playbook (AI Proposed)
+                        </h2>
+<button class="text-on-surface-variant hover:text-on-surface flex items-center gap-1 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px]">visibility</span> Preview Tree
+                        </button>
+</div>
+<div class="flex-1 p-6 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+<!-- Problem Title -->
+<div class="bg-surface-container-high rounded border border-outline-variant p-4 relative group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-evidence-blue rounded-l"></div>
+<div class="flex justify-between items-start mb-2">
+<span class="font-label-caps text-label-caps text-outline flex items-center gap-1">
+                                    PROBLEM TITLE <span class="text-evidence-blue">[AI Inferred]</span>
+</span>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-status-ci-verified hover:bg-surface-container-highest rounded"><span class="material-symbols-outlined text-[18px]">check</span></button>
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+</div>
+</div>
+<div class="font-headline-md text-headline-md text-on-surface">502 Errors on Payment Gateway due to Redis Connection Pool Exhaustion</div>
+</div>
+<!-- Environment -->
+<div class="bg-surface-container-high rounded border border-outline-variant p-4 relative group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-outline rounded-l"></div>
+<div class="flex justify-between items-start mb-3">
+<span class="font-label-caps text-label-caps text-outline flex items-center gap-1">
+                                    ENVIRONMENT <span class="text-on-surface-variant">[From submission]</span>
+</span>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-status-ci-verified hover:bg-surface-container-highest rounded"><span class="material-symbols-outlined text-[18px]">check</span></button>
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+</div>
+</div>
+<div class="flex flex-wrap gap-2">
+<span class="font-env-tag text-env-tag bg-diagnostic-node-bg border border-outline-variant px-2 py-1 rounded text-primary">OS: EKS 1.28</span>
+<span class="font-env-tag text-env-tag bg-diagnostic-node-bg border border-outline-variant px-2 py-1 rounded text-technical-teal">Runtime: Go 1.21</span>
+<span class="font-env-tag text-env-tag bg-diagnostic-node-bg border border-outline-variant px-2 py-1 rounded text-status-confirmed">Cache: Redis 7</span>
+</div>
+</div>
+<!-- Diagnostic Tests -->
+<div class="bg-surface-container-high rounded border border-outline-variant p-4 relative group">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-evidence-blue rounded-l"></div>
+<div class="flex justify-between items-start mb-3">
+<span class="font-label-caps text-label-caps text-outline flex items-center gap-1">
+                                    DIAGNOSTIC TESTS <span class="text-evidence-blue">[2 Identified]</span>
+</span>
+<div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="p-1 text-status-ci-verified hover:bg-surface-container-highest rounded"><span class="material-symbols-outlined text-[18px]">check</span></button>
+<button class="p-1 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest rounded"><span class="material-symbols-outlined text-[18px]">edit</span></button>
+<button class="p-1 text-destructive-red hover:bg-error-container/20 rounded"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+</div>
+</div>
+<div class="space-y-3">
+<div class="bg-diagnostic-node-bg border border-outline-variant rounded p-3">
+<div class="font-body-md text-body-md font-medium text-on-surface mb-2">1. Check payment pod logs</div>
+<div class="font-code-block text-code-block text-primary-fixed-dim bg-surface-container-lowest p-2 rounded">kubectl logs -l app=payment -n production</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-2 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">search</span>
+                                        Look for: "connection refused"
+                                    </div>
+</div>
+<div class="bg-diagnostic-node-bg border border-outline-variant rounded p-3">
+<div class="font-body-md text-body-md font-medium text-on-surface mb-2">2. Verify Redis metrics</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-2 flex items-center gap-1 italic">
+<span class="material-symbols-outlined text-[14px]">info</span>
+                                        AI suggested step based on "pool limit reached"
+                                    </div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>

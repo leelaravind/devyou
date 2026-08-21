@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>ITISYOU - Active Diagnostic</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Geist:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary-fixed-dim": "#adc6ff",
+                        "surface": "#0b1326",
+                        "technical-teal": "#0D9488",
+                        "surface-variant": "#2d3449",
+                        "secondary-fixed": "#89f5e7",
+                        "status-reproduced": "#F472B6",
+                        "outline": "#8c909f",
+                        "surface-container": "#171f33",
+                        "surface-container-highest": "#2d3449",
+                        "tertiary-fixed": "#ffdcc6",
+                        "error-container": "#93000a",
+                        "on-primary-container": "#00285d",
+                        "status-confirmed": "#818CF8",
+                        "tertiary-container": "#df7412",
+                        "on-tertiary-container": "#461f00",
+                        "surface-tint": "#adc6ff",
+                        "inverse-primary": "#005ac2",
+                        "background": "#0b1326",
+                        "on-secondary": "#003732",
+                        "tertiary": "#ffb786",
+                        "outline-variant": "#424754",
+                        "on-tertiary": "#502400",
+                        "destructive-red": "#EF4444",
+                        "status-ci-verified": "#34D399",
+                        "on-tertiary-fixed": "#311400",
+                        "on-secondary-container": "#00302b",
+                        "on-primary": "#002e6a",
+                        "inverse-surface": "#dae2fd",
+                        "evidence-blue": "#3B82F6",
+                        "primary": "#adc6ff",
+                        "diagnostic-node-bg": "#1E293B",
+                        "inverse-on-surface": "#283044",
+                        "warning-amber": "#F59E0B",
+                        "surface-container-high": "#222a3d",
+                        "secondary-container": "#29a195",
+                        "surface-bright": "#31394d",
+                        "on-surface-variant": "#c2c6d6",
+                        "on-surface": "#dae2fd",
+                        "primary-container": "#4d8eff",
+                        "on-background": "#dae2fd",
+                        "on-tertiary-fixed-variant": "#723600",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-container-low": "#131b2e",
+                        "tertiary-fixed-dim": "#ffb786",
+                        "on-error": "#690005",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed-variant": "#005049",
+                        "on-error-container": "#ffdad6",
+                        "status-documented": "#94A3B8",
+                        "on-primary-fixed-variant": "#004395",
+                        "surface-container-lowest": "#060e20",
+                        "secondary": "#6bd8cb",
+                        "surface-dim": "#0b1326",
+                        "secondary-fixed-dim": "#6bd8cb",
+                        "on-primary-fixed": "#001a42",
+                        "on-secondary-fixed": "#00201d"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "density-high": "8px",
+                        "gutter": "16px",
+                        "margin": "24px",
+                        "density-compact": "4px",
+                        "unit": "4px"
+                    },
+                    fontFamily: {
+                        "headline-md": ["Geist"],
+                        "headline-lg": ["Geist"],
+                        "label-caps": ["JetBrains Mono"],
+                        "body-sm": ["Inter"],
+                        "code-block": ["JetBrains Mono"],
+                        "env-tag": ["JetBrains Mono"],
+                        "body-md": ["Inter"]
+                    },
+                    fontSize: {
+                        "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+                        "headline-lg": ["30px", { lineHeight: "36px", letterSpacing: "-0.02em", fontWeight: "600" }],
+                        "label-caps": ["11px", { lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "700" }],
+                        "body-sm": ["13px", { lineHeight: "18px", fontWeight: "400" }],
+                        "code-block": ["13px", { lineHeight: "20px", fontWeight: "400" }],
+                        "env-tag": ["12px", { lineHeight: "14px", fontWeight: "500" }],
+                        "body-md": ["14px", { lineHeight: "20px", fontWeight: "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        /* Custom scrollbar for terminal */
+        .terminal-scroll::-webkit-scrollbar {
+            height: 6px;
+        }
+        .terminal-scroll::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+        }
+        .terminal-scroll::-webkit-scrollbar-thumb {
+            background: #424754;
+            border-radius: 4px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md text-body-md antialiased flex flex-col h-screen overflow-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- Task Header (Nav Suppressed per rules for transactional page) -->
+<header class="flex justify-between items-center px-gutter h-16 border-b border-outline-variant bg-surface-container-low shrink-0">
+<button aria-label="Close Session" class="p-2 -ml-2 text-on-surface-variant hover:text-on-surface transition-colors">
+<span class="material-symbols-outlined">close</span>
+</button>
+<h1 class="font-headline-md text-headline-md text-primary tracking-tight">Active Trace</h1>
+<button aria-label="View Full Map" class="p-2 -mr-2 text-evidence-blue flex items-center gap-1 hover:text-primary transition-colors" id="toggle-map-btn">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_tree</span>
+</button>
+</header>
+<!-- Collapsible Progress Bar -->
+<div class="bg-surface-container border-b border-outline-variant px-gutter py-3 shrink-0">
+<div class="flex items-center gap-2 overflow-x-auto whitespace-nowrap terminal-scroll pb-1">
+<span class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">computer</span> Core API
+            </span>
+<span class="material-symbols-outlined text-outline-variant text-[16px]">chevron_right</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Auth Svc</span>
+<span class="material-symbols-outlined text-outline-variant text-[16px]">chevron_right</span>
+<span class="font-body-sm text-body-sm text-primary font-medium flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-evidence-blue">target</span> Token Validation
+            </span>
+</div>
+</div>
+<!-- Main Content Area -->
+<main class="flex-1 overflow-y-auto p-margin space-y-margin bg-background">
+<!-- Node Context -->
+<div class="space-y-4">
+<div class="flex gap-2 flex-wrap">
+<span class="font-env-tag text-env-tag px-2 py-1 border border-outline-variant rounded bg-surface-container-highest text-secondary-fixed">ENV: STAGING</span>
+<span class="font-env-tag text-env-tag px-2 py-1 border border-outline-variant rounded bg-surface-container-highest text-status-confirmed">SVC: AUTH-V2</span>
+</div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface leading-tight">Validate JWT Signature</h2>
+<p class="font-body-md text-body-md text-on-surface-variant">
+                Verify if the current staging environment is rejecting valid tokens due to a key rotation mismatch. Run the diagnostic script to check the JWKS endpoint response against the active token.
+            </p>
+</div>
+<!-- Evidence Banner (Optional context) -->
+<div class="flex items-start gap-3 p-3 border border-outline-variant rounded-lg bg-surface-container-low">
+<span class="material-symbols-outlined text-warning-amber mt-0.5">warning</span>
+<div>
+<span class="font-label-caps text-label-caps text-on-surface block mb-1 uppercase">Previous Node Output</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Redis cache miss rate spike detected prior to auth failure.</span>
+</div>
+</div>
+<!-- Terminal Command Block -->
+<div class="bg-diagnostic-node-bg border border-outline-variant rounded-lg overflow-hidden flex flex-col shadow-[inset_2px_0_0_0_#0D9488]">
+<div class="flex justify-between items-center px-3 py-2 bg-[#171f33] border-b border-outline-variant">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px] text-technical-teal">terminal</span>
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase">Run Diagnostic</span>
+</div>
+<button class="text-on-surface-variant hover:text-on-surface flex items-center gap-1 transition-colors" id="copy-btn">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+<div class="p-4 overflow-x-auto terminal-scroll">
+<code class="font-code-block text-code-block text-on-surface whitespace-pre" id="command-text">curl -s -X GET "https://auth-api.staging.itisyou.dev/.well-known/jwks.json" | jq '.keys[] | select(.use == "sig")'</code>
+</div>
+</div>
+<!-- Spacer for scrolling above pinned footer -->
+<div class="h-8"></div>
+</main>
+<!-- Pinned Action Footer -->
+<footer class="shrink-0 p-gutter border-t border-outline-variant bg-surface-container pt-4 pb-8 z-10 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.5)]">
+<div class="grid grid-cols-2 gap-4 max-w-md mx-auto w-full">
+<button class="flex items-center justify-center gap-2 py-3 px-4 rounded-lg border-2 border-destructive-red text-destructive-red bg-transparent active:bg-destructive-red/10 transition-colors">
+<span class="material-symbols-outlined">close</span>
+<span class="font-label-caps text-label-caps uppercase">Failed</span>
+</button>
+<button class="flex items-center justify-center gap-2 py-3 px-4 rounded-lg bg-status-ci-verified text-surface active:opacity-80 transition-opacity">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-label-caps text-label-caps uppercase text-[#00201d]">Passed</span>
+</button>
+</div>
+<div class="mt-4 text-center">
+<button class="font-body-sm text-body-sm text-on-surface-variant underline underline-offset-4 hover:text-on-surface">
+                Skip to next node
+            </button>
+</div>
+</footer>
+<!-- Full Map Drawer (Hidden by default) -->
+<div class="fixed inset-0 z-50 transform translate-y-full transition-transform duration-300 ease-in-out bg-background flex flex-col" id="map-drawer">
+<header class="flex justify-between items-center px-gutter h-16 border-b border-outline-variant bg-surface-container-low shrink-0">
+<h2 class="font-headline-md text-headline-md text-on-surface">Diagnostic Map</h2>
+<button aria-label="Close Map" class="p-2 -mr-2 text-on-surface-variant hover:text-on-surface transition-colors" id="close-map-btn">
+<span class="material-symbols-outlined">expand_more</span>
+</button>
+</header>
+<div class="flex-1 p-margin overflow-y-auto relative flex items-center justify-center">
+<!-- Simulated Map placeholder -->
+<div class="text-center opacity-50 space-y-4 border-2 border-dashed border-outline-variant p-8 rounded-xl w-full h-full flex flex-col items-center justify-center">
+<span class="material-symbols-outlined text-[48px]">account_tree</span>
+<p class="font-body-md text-body-md text-on-surface-variant">Interactive map visualization would render here.<br/>Use desktop view for full tree interaction.</p>
+</div>
+</div>
+</div>
+<script>
+        // Copy to clipboard functionality
+        document.getElementById('copy-btn').addEventListener('click', function() {
+            const textToCopy = document.getElementById('command-text').innerText;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const icon = this.querySelector('.material-symbols-outlined');
+                icon.innerText = 'check';
+                icon.classList.add('text-status-ci-verified');
+                setTimeout(() => {
+                    icon.innerText = 'content_copy';
+                    icon.classList.remove('text-status-ci-verified');
+                }, 2000);
+            });
+        });
+
+        // Map Drawer Toggle
+        const mapDrawer = document.getElementById('map-drawer');
+        document.getElementById('toggle-map-btn').addEventListener('click', () => {
+            mapDrawer.classList.remove('translate-y-full');
+        });
+        document.getElementById('close-map-btn').addEventListener('click', () => {
+            mapDrawer.classList.add('translate-y-full');
+        });
+    </script>
+</body></html>

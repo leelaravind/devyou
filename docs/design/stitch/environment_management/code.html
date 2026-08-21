@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DEV.ITISYOU - My Environment</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&amp;family=Inter:wght@400;500&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "primary-fixed-dim": "#adc6ff",
+                        "surface": "#0b1326",
+                        "technical-teal": "#0D9488",
+                        "surface-variant": "#2d3449",
+                        "secondary-fixed": "#89f5e7",
+                        "status-reproduced": "#F472B6",
+                        "outline": "#8c909f",
+                        "surface-container": "#171f33",
+                        "surface-container-highest": "#2d3449",
+                        "tertiary-fixed": "#ffdcc6",
+                        "error-container": "#93000a",
+                        "on-primary-container": "#00285d",
+                        "status-confirmed": "#818CF8",
+                        "tertiary-container": "#df7412",
+                        "on-tertiary-container": "#461f00",
+                        "surface-tint": "#adc6ff",
+                        "inverse-primary": "#005ac2",
+                        "background": "#0b1326",
+                        "on-secondary": "#003732",
+                        "tertiary": "#ffb786",
+                        "outline-variant": "#424754",
+                        "on-tertiary": "#502400",
+                        "destructive-red": "#EF4444",
+                        "status-ci-verified": "#34D399",
+                        "on-tertiary-fixed": "#311400",
+                        "on-secondary-container": "#00302b",
+                        "on-primary": "#002e6a",
+                        "inverse-surface": "#dae2fd",
+                        "evidence-blue": "#3B82F6",
+                        "primary": "#adc6ff",
+                        "diagnostic-node-bg": "#1E293B",
+                        "inverse-on-surface": "#283044",
+                        "warning-amber": "#F59E0B",
+                        "surface-container-high": "#222a3d",
+                        "secondary-container": "#29a195",
+                        "surface-bright": "#31394d",
+                        "on-surface-variant": "#c2c6d6",
+                        "on-surface": "#dae2fd",
+                        "primary-container": "#4d8eff",
+                        "on-background": "#dae2fd",
+                        "on-tertiary-fixed-variant": "#723600",
+                        "primary-fixed": "#d8e2ff",
+                        "surface-container-low": "#131b2e",
+                        "tertiary-fixed-dim": "#ffb786",
+                        "on-error": "#690005",
+                        "error": "#ffb4ab",
+                        "on-secondary-fixed-variant": "#005049",
+                        "on-error-container": "#ffdad6",
+                        "status-documented": "#94A3B8",
+                        "on-primary-fixed-variant": "#004395",
+                        "surface-container-lowest": "#060e20",
+                        "secondary": "#6bd8cb",
+                        "surface-dim": "#0b1326",
+                        "secondary-fixed-dim": "#6bd8cb",
+                        "on-primary-fixed": "#001a42",
+                        "on-secondary-fixed": "#00201d"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "density-high": "8px",
+                        "gutter": "16px",
+                        "margin": "24px",
+                        "density-compact": "4px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Geist", "sans-serif"],
+                        "headline-lg": ["Geist", "sans-serif"],
+                        "label-caps": ["JetBrains Mono", "monospace"],
+                        "body-sm": ["Inter", "sans-serif"],
+                        "code-block": ["JetBrains Mono", "monospace"],
+                        "env-tag": ["JetBrains Mono", "monospace"],
+                        "body-md": ["Inter", "sans-serif"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                        "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "code-block": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "env-tag": ["12px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+        
+        /* Custom scrollbar for deep slate aesthetic */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0F172A;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #424754;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col md:flex-row overflow-hidden font-body-md">
+<!-- Desktop Sidebar -->
+<nav class="hidden md:flex flex-col h-full w-[280px] py-margin bg-surface-container z-40 border-r border-outline-variant dark:border-outline-variant docked fixed left-0 top-0">
+<div class="px-margin mb-8">
+<h1 class="font-headline-md text-headline-md text-primary flex items-center gap-2">
+<span class="material-symbols-outlined text-3xl">terminal</span>
+                ITISYOU
+            </h1>
+<div class="mt-4 flex items-center gap-3">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high border border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface">developer_board</span>
+</div>
+<div>
+<div class="font-label-caps text-label-caps text-on-surface">Admin Shell</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">v2.4.0-stable</div>
+</div>
+</div>
+<button class="mt-6 w-full flex items-center justify-center gap-2 bg-primary text-on-primary py-2 px-4 rounded-md font-body-sm text-body-sm font-medium hover:bg-primary-fixed transition-colors shadow-sm">
+<span class="material-symbols-outlined text-sm">add</span>
+                New Playbook
+            </button>
+</div>
+<ul class="flex-1 px-4 space-y-1">
+<li>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-md border-l-2 border-primary bg-surface-container-high text-primary font-bold translate-x-1 duration-150 transition-all font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined">settings_input_component</span>
+                    Environment
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-body-sm text-body-sm font-medium" href="#">
+<span class="material-symbols-outlined">account_tree</span>
+                    Diagnostics
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-body-sm text-body-sm font-medium" href="#">
+<span class="material-symbols-outlined">verified_user</span>
+                    Evidence
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-body-sm text-body-sm font-medium" href="#">
+<span class="material-symbols-outlined">history</span>
+                    History
+                </a>
+</li>
+<li>
+<a class="flex items-center gap-3 px-4 py-2.5 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-body-sm text-body-sm font-medium" href="#">
+<span class="material-symbols-outlined">tune</span>
+                    Settings
+                </a>
+</li>
+</ul>
+<div class="px-4 mt-auto space-y-1">
+<div class="border-t border-outline-variant pt-4 mb-2"></div>
+<a class="flex items-center gap-3 px-4 py-2 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]">description</span>
+                Docs
+            </a>
+<a class="flex items-center gap-3 px-4 py-2 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all font-body-sm text-body-sm" href="#">
+<span class="material-symbols-outlined text-[18px]">help</span>
+                Support
+            </a>
+</div>
+</nav>
+<!-- Main Workspace -->
+<main class="flex-1 md:ml-[280px] h-screen overflow-y-auto bg-[#0F172A]">
+<!-- Top App Bar (Mobile Only for Navigation, but we keep it minimal here as requested by guidelines) -->
+<header class="md:hidden flex justify-between items-center w-full px-margin h-16 z-50 bg-surface-container-low dark:bg-surface-container-low border-b border-outline-variant dark:border-outline-variant">
+<div class="font-headline-md text-headline-md font-bold text-primary dark:text-primary-fixed-dim">ITISYOU</div>
+<div class="flex gap-4">
+<span class="material-symbols-outlined text-primary cursor-pointer hover:text-primary-fixed transition-colors">menu</span>
+</div>
+</header>
+<!-- Page Content Area -->
+<div class="p-gutter md:p-margin max-w-6xl mx-auto space-y-8">
+<!-- Page Header -->
+<div class="border-b border-[#334155] pb-6 mt-4">
+<h2 class="font-headline-lg text-headline-lg text-on-background">My Environments</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 max-w-2xl">
+                    Manage your development environments to get matched diagnostic results. Accurate context ensures playbooks run reliably and trace relevant dependencies.
+                </p>
+</div>
+<!-- Bento Grid Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Left Column: Environment List -->
+<div class="lg:col-span-5 flex flex-col gap-unit">
+<div class="flex justify-between items-center mb-2">
+<h3 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Saved Presets</h3>
+<button class="flex items-center gap-1 text-primary hover:text-primary-fixed transition-colors font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[16px]">add</span>
+                            Add Preset
+                        </button>
+</div>
+<!-- Preset Item (Active) -->
+<label class="cursor-pointer group">
+<input checked="" class="peer sr-only" name="environment" type="radio"/>
+<div class="bg-diagnostic-node-bg border border-[#334155] rounded-lg p-4 flex gap-4 transition-all peer-checked:border-l-2 peer-checked:border-l-primary peer-checked:bg-surface-container-high relative overflow-hidden group-hover:border-[#424754]">
+<!-- Inner Glow Effect for Active -->
+<div class="absolute inset-0 bg-primary opacity-0 peer-checked:opacity-5 pointer-events-none"></div>
+<div class="pt-1">
+<div class="w-5 h-5 rounded-full border border-outline flex items-center justify-center peer-checked:border-primary peer-checked:bg-primary/20 transition-colors">
+<div class="w-2.5 h-2.5 rounded-full bg-primary opacity-0 group-[.peer:checked+div_&amp;]:opacity-100 transition-opacity"></div>
+</div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h4 class="font-body-md text-body-md font-medium text-on-surface">Work: Ubuntu + Node 24</h4>
+<span class="bg-status-ci-verified/10 text-status-ci-verified font-label-caps text-[10px] px-2 py-0.5 rounded border border-status-ci-verified/20 flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">check_circle</span> ACTIVE
+                                    </span>
+</div>
+<div class="mt-2 flex flex-wrap gap-2">
+<span class="font-env-tag text-env-tag text-evidence-blue bg-evidence-blue/10 border border-evidence-blue/20 px-2 py-0.5 rounded-sm">Ubuntu 22.04</span>
+<span class="font-env-tag text-env-tag text-technical-teal bg-technical-teal/10 border border-technical-teal/20 px-2 py-0.5 rounded-sm">Node.js v24</span>
+</div>
+</div>
+</div>
+</label>
+<!-- Preset Item (Inactive) -->
+<label class="cursor-pointer group">
+<input class="peer sr-only" name="environment" type="radio"/>
+<div class="bg-diagnostic-node-bg border border-[#334155] rounded-lg p-4 flex gap-4 transition-all peer-checked:border-l-2 peer-checked:border-l-primary peer-checked:bg-surface-container-high relative overflow-hidden group-hover:border-[#424754]">
+<div class="absolute inset-0 bg-primary opacity-0 peer-checked:opacity-5 pointer-events-none"></div>
+<div class="pt-1">
+<div class="w-5 h-5 rounded-full border border-outline flex items-center justify-center peer-checked:border-primary peer-checked:bg-primary/20 transition-colors">
+<div class="w-2.5 h-2.5 rounded-full bg-primary opacity-0 group-[.peer:checked+div_&amp;]:opacity-100 transition-opacity"></div>
+</div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h4 class="font-body-md text-body-md font-medium text-on-surface">Personal: macOS + Bun</h4>
+</div>
+<div class="mt-2 flex flex-wrap gap-2">
+<span class="font-env-tag text-env-tag text-evidence-blue bg-evidence-blue/10 border border-evidence-blue/20 px-2 py-0.5 rounded-sm">macOS 14.2</span>
+<span class="font-env-tag text-env-tag text-technical-teal bg-technical-teal/10 border border-technical-teal/20 px-2 py-0.5 rounded-sm">Bun v1.1</span>
+</div>
+</div>
+</div>
+</label>
+<!-- Preset Item (Inactive) -->
+<label class="cursor-pointer group">
+<input class="peer sr-only" name="environment" type="radio"/>
+<div class="bg-diagnostic-node-bg border border-[#334155] rounded-lg p-4 flex gap-4 transition-all peer-checked:border-l-2 peer-checked:border-l-primary peer-checked:bg-surface-container-high relative overflow-hidden group-hover:border-[#424754]">
+<div class="absolute inset-0 bg-primary opacity-0 peer-checked:opacity-5 pointer-events-none"></div>
+<div class="pt-1">
+<div class="w-5 h-5 rounded-full border border-outline flex items-center justify-center peer-checked:border-primary peer-checked:bg-primary/20 transition-colors">
+<div class="w-2.5 h-2.5 rounded-full bg-primary opacity-0 group-[.peer:checked+div_&amp;]:opacity-100 transition-opacity"></div>
+</div>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start">
+<h4 class="font-body-md text-body-md font-medium text-on-surface-variant">Legacy Project (Archived)</h4>
+</div>
+<div class="mt-2 flex flex-wrap gap-2 opacity-70">
+<span class="font-env-tag text-env-tag text-outline bg-outline/10 border border-outline/20 px-2 py-0.5 rounded-sm">CentOS 7</span>
+<span class="font-env-tag text-env-tag text-outline bg-outline/10 border border-outline/20 px-2 py-0.5 rounded-sm">Python 2.7</span>
+</div>
+</div>
+</div>
+</label>
+<button class="mt-4 text-left font-body-sm text-body-sm text-on-surface-variant hover:text-destructive-red transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">delete</span>
+                        Clear current environment
+                    </button>
+</div>
+<!-- Right Column: Detail View & Analytics -->
+<div class="lg:col-span-7 flex flex-col gap-gutter">
+<!-- Matching Benefit Banner -->
+<div class="bg-surface-container border border-[#334155] rounded-lg p-4 flex items-start gap-4">
+<div class="text-status-confirmed mt-1">
+<span class="material-symbols-outlined" data-weight="fill">insights</span>
+</div>
+<div>
+<h4 class="font-body-md text-body-md font-medium text-on-surface">Optimization Active</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">
+                                Environment matching improves result relevance and prioritizes verified playbooks specifically tested against <span class="font-code-block text-code-block text-primary">Ubuntu 22.04</span> and <span class="font-code-block text-code-block text-primary">Node 24</span>.
+                            </p>
+</div>
+</div>
+<!-- Details Inspector Card (Glassmorphism inspired but strictly within system constraints) -->
+<div class="bg-[#1E293B] border border-[#334155] rounded-xl overflow-hidden flex flex-col h-full">
+<div class="bg-surface-container-high px-6 py-4 border-b border-[#334155] flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-on-surface text-lg">Work: Ubuntu + Node 24</h3>
+<button class="text-primary hover:text-primary-fixed transition-colors bg-primary/10 px-3 py-1.5 rounded flex items-center gap-2 font-body-sm text-body-sm font-medium border border-primary/20">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+                                Edit Preset
+                            </button>
+</div>
+<div class="p-6 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-6">
+<!-- Attribute Node -->
+<div class="space-y-2">
+<div class="font-label-caps text-label-caps text-outline uppercase tracking-wider flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">desktop_windows</span>
+                                    Operating System
+                                </div>
+<div class="flex items-center gap-3 bg-background border border-[#334155] px-3 py-2 rounded-md">
+<div class="w-2 h-2 rounded-full bg-evidence-blue"></div>
+<span class="font-code-block text-code-block text-on-surface">Ubuntu 22.04 LTS</span>
+</div>
+</div>
+<!-- Attribute Node -->
+<div class="space-y-2">
+<div class="font-label-caps text-label-caps text-outline uppercase tracking-wider flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">terminal</span>
+                                    Runtime
+                                </div>
+<div class="flex items-center gap-3 bg-background border border-[#334155] px-3 py-2 rounded-md">
+<div class="w-2 h-2 rounded-full bg-technical-teal"></div>
+<span class="font-code-block text-code-block text-on-surface">Node.js v24.1.0</span>
+</div>
+</div>
+<!-- Attribute Node -->
+<div class="space-y-2">
+<div class="font-label-caps text-label-caps text-outline uppercase tracking-wider flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">extension</span>
+                                    Framework
+                                </div>
+<div class="flex items-center gap-3 bg-background border border-[#334155] px-3 py-2 rounded-md">
+<div class="w-2 h-2 rounded-full bg-[#818CF8]"></div>
+<span class="font-code-block text-code-block text-on-surface">Next.js 14 (App Router)</span>
+</div>
+</div>
+<!-- Attribute Node -->
+<div class="space-y-2">
+<div class="font-label-caps text-label-caps text-outline uppercase tracking-wider flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">cloud</span>
+                                    Cloud Provider
+                                </div>
+<div class="flex items-center gap-3 bg-background border border-[#334155] px-3 py-2 rounded-md">
+<div class="w-2 h-2 rounded-full bg-warning-amber"></div>
+<span class="font-code-block text-code-block text-on-surface">AWS (us-east-1)</span>
+</div>
+</div>
+<!-- Attribute Node -->
+<div class="space-y-2 sm:col-span-2">
+<div class="font-label-caps text-label-caps text-outline uppercase tracking-wider flex items-center gap-2">
+<span class="material-symbols-outlined text-[14px]">database</span>
+                                    Database
+                                </div>
+<div class="flex items-center gap-3 bg-background border border-[#334155] px-3 py-2 rounded-md">
+<div class="w-2 h-2 rounded-full bg-[#34D399]"></div>
+<span class="font-code-block text-code-block text-on-surface">PostgreSQL 16.2</span>
+</div>
+</div>
+</div>
+<!-- JSON Raw View Output (Terminal feel) -->
+<div class="mt-auto bg-[#0b1326] border-t border-[#334155] p-4 font-code-block text-code-block text-sm text-outline-variant relative group">
+<div class="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity">
+<button class="text-on-surface-variant hover:text-on-surface bg-surface-container border border-[#334155] p-1.5 rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-[16px]">content_copy</span>
+</button>
+</div>
+<pre><code class="text-on-surface-variant">{
+  "id": "env_w0rk992",
+  "name": "Work: Ubuntu + Node 24",
+  "os": "ubuntu@22.04",
+  "runtime": "node@24.1.0",
+  "strict_matching": true,
+  "last_synced": "2024-05-12T08:30:00Z"
+}</code></pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</body></html>

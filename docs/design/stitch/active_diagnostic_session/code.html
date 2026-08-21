@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Playbook: Cloudflare D1 SQLITE_BUSY - DEV.ITISYOU</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;800&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "primary-fixed-dim": "#adc6ff",
+                      "surface": "#0b1326",
+                      "technical-teal": "#0D9488",
+                      "surface-variant": "#2d3449",
+                      "secondary-fixed": "#89f5e7",
+                      "status-reproduced": "#F472B6",
+                      "outline": "#8c909f",
+                      "surface-container": "#171f33",
+                      "surface-container-highest": "#2d3449",
+                      "tertiary-fixed": "#ffdcc6",
+                      "error-container": "#93000a",
+                      "on-primary-container": "#00285d",
+                      "status-confirmed": "#818CF8",
+                      "tertiary-container": "#df7412",
+                      "on-tertiary-container": "#461f00",
+                      "surface-tint": "#adc6ff",
+                      "inverse-primary": "#005ac2",
+                      "background": "#0b1326",
+                      "on-secondary": "#003732",
+                      "tertiary": "#ffb786",
+                      "outline-variant": "#424754",
+                      "on-tertiary": "#502400",
+                      "destructive-red": "#EF4444",
+                      "status-ci-verified": "#34D399",
+                      "on-tertiary-fixed": "#311400",
+                      "on-secondary-container": "#00302b",
+                      "on-primary": "#002e6a",
+                      "inverse-surface": "#dae2fd",
+                      "evidence-blue": "#3B82F6",
+                      "primary": "#adc6ff",
+                      "diagnostic-node-bg": "#1E293B",
+                      "inverse-on-surface": "#283044",
+                      "warning-amber": "#F59E0B",
+                      "surface-container-high": "#222a3d",
+                      "secondary-container": "#29a195",
+                      "surface-bright": "#31394d",
+                      "on-surface-variant": "#c2c6d6",
+                      "on-surface": "#dae2fd",
+                      "primary-container": "#4d8eff",
+                      "on-background": "#dae2fd",
+                      "on-tertiary-fixed-variant": "#723600",
+                      "primary-fixed": "#d8e2ff",
+                      "surface-container-low": "#131b2e",
+                      "tertiary-fixed-dim": "#ffb786",
+                      "on-error": "#690005",
+                      "error": "#ffb4ab",
+                      "on-secondary-fixed-variant": "#005049",
+                      "on-error-container": "#ffdad6",
+                      "status-documented": "#94A3B8",
+                      "on-primary-fixed-variant": "#004395",
+                      "surface-container-lowest": "#060e20",
+                      "secondary": "#6bd8cb",
+                      "surface-dim": "#0b1326",
+                      "secondary-fixed-dim": "#6bd8cb",
+                      "on-primary-fixed": "#001a42",
+                      "on-secondary-fixed": "#00201d"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "density-high": "8px",
+                      "gutter": "16px",
+                      "margin": "24px",
+                      "density-compact": "4px",
+                      "unit": "4px"
+              },
+              "fontFamily": {
+                      "headline-md": [
+                              "Geist"
+                      ],
+                      "headline-lg": [
+                              "Geist"
+                      ],
+                      "label-caps": [
+                              "JetBrains Mono"
+                      ],
+                      "body-sm": [
+                              "Inter"
+                      ],
+                      "code-block": [
+                              "JetBrains Mono"
+                      ],
+                      "env-tag": [
+                              "JetBrains Mono"
+                      ],
+                      "body-md": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "30px",
+                              {
+                                      "lineHeight": "36px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "label-caps": [
+                              "11px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-sm": [
+                              "13px",
+                              {
+                                      "lineHeight": "18px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "code-block": [
+                              "13px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "env-tag": [
+                              "12px",
+                              {
+                                      "lineHeight": "14px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md h-screen flex flex-col overflow-hidden">
+<!-- TopNavBar (Shared Component) -->
+<nav class="bg-surface-container-low border-b border-outline-variant flex justify-between items-center w-full px-margin h-16 z-50 shrink-0">
+<div class="flex items-center gap-gutter">
+<span class="font-headline-md text-headline-md font-bold text-primary">ITISYOU</span>
+</div>
+<div class="flex items-center gap-margin">
+<div class="flex gap-gutter">
+<a class="text-primary border-b-2 border-primary font-bold px-2 py-4 font-label-caps text-label-caps h-full flex items-center" href="#">Playbooks</a>
+<a class="text-on-surface-variant font-medium hover:bg-surface-container-highest transition-colors px-2 py-4 font-label-caps text-label-caps h-full flex items-center" href="#">Contribute</a>
+</div>
+<div class="flex gap-density-high">
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-highest rounded transition-colors" title="hub">
+<span class="material-symbols-outlined">hub</span>
+</button>
+<button class="p-2 text-on-surface-variant hover:bg-surface-container-highest rounded transition-colors" title="account_circle">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</nav>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar (Shared Component) -->
+<aside class="flex flex-col h-full w-[280px] py-margin bg-surface-container z-40 border-r border-outline-variant shrink-0 overflow-y-auto">
+<div class="px-margin mb-margin">
+<div class="flex items-center gap-density-high mb-2">
+<div class="w-8 h-8 rounded bg-surface-container-high border border-outline flex items-center justify-center">
+<img alt="System Status" class="w-full h-full object-cover rounded opacity-80" data-alt="A futuristic glowing server rack in a dark room. Teal and blue LEDs illuminate the metallic chassis. Technical and analytical style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC5ByY75LaWsqOdH-370j88pMJjkDYfDQR38fGTl8K9tEf1DbWpAa8fLfn9yLpMoXFFNtpEciuSyUa14W3BwAvTQ6RiD2X_3IxHy78c-WeUZptZugVHFoYHPao1LtLPh65OUnmQYTgv9PEbjQMkuJWqiDUnSDIQ1H8SHamThePVVTr-zgidElNpTWo5QlKWW4GXPQSCEk2XGQOLhF6KtnVwDSdIUH7xNY2g7fjB5GgDq4qIP08syTEjEQ"/>
+</div>
+<div>
+<h2 class="font-headline-md text-body-md font-semibold text-primary">Admin Shell</h2>
+<p class="font-label-caps text-label-caps text-on-surface-variant">v2.4.0-stable</p>
+</div>
+</div>
+<button class="w-full mt-4 bg-primary text-on-primary py-2 px-4 rounded font-label-caps text-label-caps hover:bg-primary-fixed transition-colors flex justify-center items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">add</span> New Playbook
+                </button>
+</div>
+<nav class="flex-1 flex flex-col gap-1 px-density-high">
+<a class="flex items-center gap-density-high px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all rounded font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">settings_input_component</span> Environment
+                </a>
+<a class="flex items-center gap-density-high px-3 py-2 border-l-2 border-primary bg-surface-container-high text-primary font-bold rounded-r transition-all duration-150 font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">account_tree</span> Diagnostics
+                </a>
+<a class="flex items-center gap-density-high px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all rounded font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">verified_user</span> Evidence
+                </a>
+<a class="flex items-center gap-density-high px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all rounded font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">history</span> History
+                </a>
+<a class="flex items-center gap-density-high px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all rounded font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">tune</span> Settings
+                </a>
+</nav>
+<div class="px-density-high mt-auto pt-margin border-t border-outline-variant border-opacity-30">
+<a class="flex items-center gap-density-high px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all rounded font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">description</span> Docs
+                </a>
+<a class="flex items-center gap-density-high px-3 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-highest transition-all rounded font-label-caps text-label-caps" href="#">
+<span class="material-symbols-outlined">help</span> Support
+                </a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex overflow-hidden">
+<!-- Left Column: The Map (30%) -->
+<div class="w-[30%] min-w-[300px] border-r border-outline-variant bg-surface-container-lowest flex flex-col p-margin overflow-y-auto">
+<h3 class="font-headline-md text-headline-md mb-margin text-on-surface">Diagnostic Tree</h3>
+<div class="relative pl-6 border-l border-outline-variant space-y-8">
+<!-- Node 1: Completed -->
+<div class="relative">
+<div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-status-ci-verified border-2 border-surface-container-lowest z-10 flex items-center justify-center">
+<span class="material-symbols-outlined text-surface-container-lowest text-[10px] font-bold" style="font-variation-settings: 'FILL' 1;">check</span>
+</div>
+<div class="opacity-70">
+<p class="font-label-caps text-label-caps text-status-ci-verified mb-1">Passed</p>
+<h4 class="font-body-md text-body-md font-semibold text-on-surface">Verify D1 Bindings</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Confirmed wrangler.toml configuration matches expected schema.</p>
+</div>
+</div>
+<!-- Node 2: Active -->
+<div class="relative">
+<div class="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-primary border-2 border-surface-container-lowest z-10 animate-pulse shadow-[0_0_8px_rgba(173,198,255,0.6)]"></div>
+<div class="bg-diagnostic-node-bg border border-outline border-l-2 border-l-primary rounded p-3 -ml-2 shadow-sm">
+<p class="font-label-caps text-label-caps text-primary mb-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">progress_activity</span> In Progress
+                            </p>
+<h4 class="font-body-md text-body-md font-semibold text-on-surface">Test Local Concurrency</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Simulate concurrent writes to local SQLite instance.</p>
+</div>
+</div>
+<!-- Node 3: Future -->
+<div class="relative">
+<div class="absolute -left-[29px] top-1 w-3 h-3 rounded-full bg-surface-variant border-2 border-outline-variant z-10"></div>
+<div class="opacity-40 grayscale">
+<p class="font-label-caps text-label-caps text-on-surface-variant mb-1">Pending</p>
+<h4 class="font-body-md text-body-md font-semibold text-on-surface">Analyze WAL Mode</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Check if Write-Ahead Logging is correctly enabled.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: The Territory (70%) -->
+<div class="flex-1 flex flex-col bg-background overflow-y-auto">
+<!-- Header -->
+<header class="p-margin border-b border-outline-variant bg-surface">
+<div class="flex justify-between items-start mb-4">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Cloudflare D1 returns SQLITE_BUSY under concurrent writes</h1>
+<span class="font-label-caps text-label-caps bg-evidence-blue bg-opacity-20 text-evidence-blue px-2 py-1 rounded border border-evidence-blue/30 flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">policy</span> Evidence: Strong
+                        </span>
+</div>
+<div class="flex gap-density-high">
+<span class="font-env-tag text-env-tag bg-technical-teal/10 text-technical-teal border border-technical-teal/30 px-2 py-1 rounded">OS: Ubuntu 24.04</span>
+<span class="font-env-tag text-env-tag bg-primary/10 text-primary border border-primary/30 px-2 py-1 rounded">Runtime: Node 20</span>
+<span class="font-env-tag text-env-tag bg-status-confirmed/10 text-status-confirmed border border-status-confirmed/30 px-2 py-1 rounded flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]">verified</span> Verified in env
+                        </span>
+</div>
+</header>
+<!-- Main Panel -->
+<div class="p-margin flex-1 space-y-margin">
+<section>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">science</span> What to test
+                        </h2>
+<p class="font-body-md text-body-md text-on-surface-variant mb-4">
+                            We need to verify if the local D1 instance is locking up when multiple write operations hit it simultaneously. The script below will spawn 5 concurrent `INSERT` statements against the local database.
+                        </p>
+<!-- Run Block -->
+<div class="bg-surface-container-high rounded border border-outline-variant overflow-hidden">
+<div class="bg-surface-container px-3 py-2 border-b border-outline-variant flex justify-between items-center">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Execute in Terminal</span>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center gap-1 font-label-caps text-label-caps">
+<span class="material-symbols-outlined text-[14px]">content_copy</span> Copy
+                                </button>
+</div>
+<div class="p-4 font-code-block text-code-block text-inverse-surface overflow-x-auto whitespace-pre">
+<span class="text-status-reproduced">npx</span> concurrently \
+  "wrangler d1 execute MY_DB --local --command='INSERT INTO test (id) VALUES (1)'" \
+  "wrangler d1 execute MY_DB --local --command='INSERT INTO test (id) VALUES (2)'" \
+  "wrangler d1 execute MY_DB --local --command='INSERT INTO test (id) VALUES (3)'"
+                            </div>
+</div>
+</section>
+<!-- Expected Result -->
+<section>
+<h3 class="font-label-caps text-label-caps text-on-surface-variant mb-2">Expected Result</h3>
+<div class="bg-surface-container-lowest rounded border border-outline-variant p-4 font-code-block text-code-block text-status-documented opacity-80 border-dashed">
+[0] Executing on local database MY_DB (path/to/db)
+[1] Executing on local database MY_DB (path/to/db)
+[2] Executing on local database MY_DB (path/to/db)
+[0] ┌──────────────────────────┐
+[0] │ changes: 1, duration: 2ms│
+[0] └──────────────────────────┘
+... (all 3 should succeed without SQLITE_BUSY)
+                        </div>
+</section>
+<!-- Safety Warning -->
+<div class="bg-error-container/20 border border-destructive-red rounded p-4 flex gap-4 items-start">
+<span class="material-symbols-outlined text-destructive-red text-[24px]">warning</span>
+<div>
+<h4 class="font-body-md text-body-md font-bold text-destructive-red">Potentially Destructive Next Step</h4>
+<p class="font-body-sm text-body-sm text-on-error-container mt-1">If this fails, the next playbook node involves running `wrangler d1 migrations apply --local`, which may reset local state depending on your schema setup.</p>
+</div>
+</div>
+<!-- Action Buttons -->
+<section class="mt-8 pt-8 border-t border-outline-variant">
+<h3 class="font-headline-md text-body-md font-semibold text-on-surface mb-4 text-center">Tell us what happened</h3>
+<div class="grid grid-cols-2 gap-4 max-w-2xl mx-auto">
+<button class="bg-surface-container border border-status-ci-verified/50 text-status-ci-verified hover:bg-status-ci-verified/10 py-4 px-4 rounded transition-colors flex flex-col items-center gap-2 group">
+<span class="material-symbols-outlined text-[24px] group-hover:scale-110 transition-transform">check_circle</span>
+<span class="font-body-md text-body-md font-semibold">Passed</span>
+<span class="font-body-sm text-body-sm opacity-70 text-center">No errors, records inserted.</span>
+</button>
+<button class="bg-surface-container border border-destructive-red/50 text-destructive-red hover:bg-destructive-red/10 py-4 px-4 rounded transition-colors flex flex-col items-center gap-2 group">
+<span class="material-symbols-outlined text-[24px] group-hover:scale-110 transition-transform">error</span>
+<span class="font-body-md text-body-md font-semibold">Failed</span>
+<span class="font-body-sm text-body-sm opacity-70 text-center">Got SQLITE_BUSY.</span>
+</button>
+<button class="bg-surface-container border border-outline-variant text-on-surface-variant hover:bg-surface-container-highest py-4 px-4 rounded transition-colors flex flex-col items-center gap-2 group">
+<span class="material-symbols-outlined text-[24px] group-hover:scale-110 transition-transform">help</span>
+<span class="font-body-md text-body-md font-semibold">Different Output</span>
+<span class="font-body-sm text-body-sm opacity-70 text-center">Something else happened.</span>
+</button>
+<button class="bg-surface-container border border-outline-variant text-on-surface-variant hover:bg-surface-container-highest py-4 px-4 rounded transition-colors flex flex-col items-center gap-2 group">
+<span class="material-symbols-outlined text-[24px] group-hover:scale-110 transition-transform">question_mark</span>
+<span class="font-body-md text-body-md font-semibold">I don't know</span>
+<span class="font-body-sm text-body-sm opacity-70 text-center">Need more help evaluating.</span>
+</button>
+</div>
+</section>
+</div>
+<!-- Expandable Bottom (Footer Area) -->
+<footer class="mt-auto border-t border-outline-variant bg-surface-container-low p-4">
+<div class="flex gap-4">
+<details class="group cursor-pointer flex-1">
+<summary class="font-label-caps text-label-caps text-on-surface-variant flex items-center justify-between list-none p-2 hover:bg-surface-container rounded transition-colors">
+                                Why this test matters
+                                <span class="material-symbols-outlined text-[16px] group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<div class="font-body-sm text-body-sm text-on-surface-variant p-2">
+                                D1 uses SQLite under the hood. Local environments often default to journal_mode=DELETE rather than WAL, making concurrent writes highly susceptible to SQLITE_BUSY locks.
+                            </div>
+</details>
+<details class="group cursor-pointer flex-1">
+<summary class="font-label-caps text-label-caps text-on-surface-variant flex items-center justify-between list-none p-2 hover:bg-surface-container rounded transition-colors">
+                                Evidence Details
+                                <span class="material-symbols-outlined text-[16px] group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<div class="font-body-sm text-body-sm text-on-surface-variant p-2">
+                                Source: GitHub Issue #4322 in cloudflare/workers-sdk.
+                            </div>
+</details>
+<details class="group cursor-pointer flex-1">
+<summary class="font-label-caps text-label-caps text-on-surface-variant flex items-center justify-between list-none p-2 hover:bg-surface-container rounded transition-colors">
+                                Revision History
+                                <span class="material-symbols-outlined text-[16px] group-open:rotate-180 transition-transform">expand_more</span>
+</summary>
+<div class="font-body-sm text-body-sm text-on-surface-variant p-2">
+                                Last updated: 2023-10-25 by system.
+                            </div>
+</details>
+</div>
+</footer>
+</div>
+</main>
+</div>
+</body></html>

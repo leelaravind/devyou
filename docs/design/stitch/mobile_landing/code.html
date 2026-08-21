@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DEV.ITISYOU - Mobile Landing</title>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Config -->
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "primary-fixed-dim": "#adc6ff",
+                    "surface": "#0b1326",
+                    "technical-teal": "#0D9488",
+                    "surface-variant": "#2d3449",
+                    "secondary-fixed": "#89f5e7",
+                    "status-reproduced": "#F472B6",
+                    "outline": "#8c909f",
+                    "surface-container": "#171f33",
+                    "surface-container-highest": "#2d3449",
+                    "tertiary-fixed": "#ffdcc6",
+                    "error-container": "#93000a",
+                    "on-primary-container": "#00285d",
+                    "status-confirmed": "#818CF8",
+                    "tertiary-container": "#df7412",
+                    "on-tertiary-container": "#461f00",
+                    "surface-tint": "#adc6ff",
+                    "inverse-primary": "#005ac2",
+                    "background": "#0b1326",
+                    "on-secondary": "#003732",
+                    "tertiary": "#ffb786",
+                    "outline-variant": "#424754",
+                    "on-tertiary": "#502400",
+                    "destructive-red": "#EF4444",
+                    "status-ci-verified": "#34D399",
+                    "on-tertiary-fixed": "#311400",
+                    "on-secondary-container": "#00302b",
+                    "on-primary": "#002e6a",
+                    "inverse-surface": "#dae2fd",
+                    "evidence-blue": "#3B82F6",
+                    "primary": "#adc6ff",
+                    "diagnostic-node-bg": "#1E293B",
+                    "inverse-on-surface": "#283044",
+                    "warning-amber": "#F59E0B",
+                    "surface-container-high": "#222a3d",
+                    "secondary-container": "#29a195",
+                    "surface-bright": "#31394d",
+                    "on-surface-variant": "#c2c6d6",
+                    "on-surface": "#dae2fd",
+                    "primary-container": "#4d8eff",
+                    "on-background": "#dae2fd",
+                    "on-tertiary-fixed-variant": "#723600",
+                    "primary-fixed": "#d8e2ff",
+                    "surface-container-low": "#131b2e",
+                    "tertiary-fixed-dim": "#ffb786",
+                    "on-error": "#690005",
+                    "error": "#ffb4ab",
+                    "on-secondary-fixed-variant": "#005049",
+                    "on-error-container": "#ffdad6",
+                    "status-documented": "#94A3B8",
+                    "on-primary-fixed-variant": "#004395",
+                    "surface-container-lowest": "#060e20",
+                    "secondary": "#6bd8cb",
+                    "surface-dim": "#0b1326",
+                    "secondary-fixed-dim": "#6bd8cb",
+                    "on-primary-fixed": "#001a42",
+                    "on-secondary-fixed": "#00201d"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "density-high": "8px",
+                    "gutter": "16px",
+                    "margin": "24px",
+                    "density-compact": "4px",
+                    "unit": "4px"
+            },
+            "fontFamily": {
+                    "headline-md": ["Geist", "sans-serif"],
+                    "headline-lg": ["Geist", "sans-serif"],
+                    "label-caps": ["JetBrains Mono", "monospace"],
+                    "body-sm": ["Inter", "sans-serif"],
+                    "code-block": ["JetBrains Mono", "monospace"],
+                    "env-tag": ["JetBrains Mono", "monospace"],
+                    "body-md": ["Inter", "sans-serif"]
+            },
+            "fontSize": {
+                    "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                    "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "600" }],
+                    "label-caps": ["11px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                    "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                    "code-block": ["13px", { "lineHeight": "20px", "fontWeight": "400" }],
+                    "env-tag": ["12px", { "lineHeight": "14px", "fontWeight": "500" }],
+                    "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }]
+            }
+          }
+        }
+      }
+    </script>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600;700&amp;family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        .filled-icon {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Hide scrollbar for clean mobile look */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="min-h-screen flex flex-col">
+<!-- TopNavBar (Adapted for Mobile) -->
+<header class="bg-surface-container-low border-b border-outline-variant flex justify-between items-center w-full px-gutter h-16 z-50 sticky top-0">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 -ml-2 rounded-lg active:scale-95">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<div class="font-headline-md text-headline-md font-bold text-primary-fixed-dim">
+            ITISYOU
+        </div>
+<div class="flex items-center gap-2">
+<button class="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-lg active:scale-95">
+<span class="material-symbols-outlined" data-icon="hub">hub</span>
+</button>
+<button class="rounded-full overflow-hidden w-8 h-8 border border-outline-variant active:scale-95 transition-transform">
+<img alt="User profile" class="w-full h-full object-cover" data-alt="A tightly cropped, high-contrast digital avatar portrait of a technical user in a dark mode environment. The lighting is moody with subtle teal and blue rim lights reflecting off modern eyewear. The style is hyper-realistic and cyber-inspired, perfectly fitting a sophisticated diagnostic dashboard interface." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDuTso_59JLDFSgtNNzA0RrnrHmmBFePAXuTd1htPicX6GhOX5BufdbHHyWSH_rksQxghyv8chaUHkkFJ68VdQWOog0X1_-dBUIZlJtKMLCG5IEePFTcV8sEtENDLu5LVWKuKYnWYqDuOK8QebH5WmSZdEBW3qc_WzR-T-AqMQej8FMhP95F6eRU-ScK_iuBlhkMq935yw8kjhfn4tg8inWt-Q2nK5uvf2lxx1yV4w1B5EvDlOWRFwY_A"/>
+</button>
+</div>
+</header>
+<main class="flex-1 flex flex-col w-full max-w-md mx-auto">
+<!-- Hero Section -->
+<section class="px-gutter py-8 flex flex-col gap-6 border-b border-outline-variant/50">
+<h1 class="font-headline-lg text-headline-lg text-on-surface text-center px-4">
+                Don't guess. <span class="text-primary">Test.</span>
+</h1>
+<p class="font-body-md text-body-md text-on-surface-variant text-center mb-2">
+                Paste logs, stack traces, or symptoms. Our engine builds the diagnostic tree.
+            </p>
+<div class="bg-surface-container border border-outline-variant rounded-xl p-1 focus-within:border-evidence-blue focus-within:ring-1 focus-within:ring-evidence-blue transition-all">
+<textarea class="w-full bg-transparent border-none focus:ring-0 font-code-block text-code-block text-on-surface placeholder:text-outline p-3 min-h-[120px] resize-none" placeholder="e.g., Error 503 Service Unavailable connecting to cluster-a. DB connections spiking..."></textarea>
+<div class="flex justify-between items-center p-2 border-t border-outline-variant/30 mt-2">
+<div class="flex gap-2">
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface rounded bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-[18px]">attach_file</span>
+</button>
+<button class="p-1.5 text-on-surface-variant hover:text-on-surface rounded bg-surface-container-highest transition-colors">
+<span class="material-symbols-outlined text-[18px]">history</span>
+</button>
+</div>
+<button class="bg-primary text-on-primary-container px-4 py-1.5 rounded-lg font-label-caps text-label-caps flex items-center gap-2 active:scale-95 transition-transform">
+<span class="material-symbols-outlined text-[16px] filled-icon">play_arrow</span>
+                        ANALYZE
+                    </button>
+</div>
+</div>
+</section>
+<!-- Workflow Demo Section -->
+<section class="px-gutter py-8 border-b border-outline-variant/50">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant mb-6 flex items-center gap-2 uppercase tracking-wider">
+<span class="material-symbols-outlined text-[16px]">account_tree</span>
+                Diagnostic Execution
+            </h2>
+<div class="relative pl-6 flex flex-col gap-4">
+<!-- Connecting Line -->
+<div class="absolute left-[11px] top-4 bottom-4 w-px bg-outline-variant z-0"></div>
+<!-- Node 1 -->
+<div class="relative z-10">
+<div class="absolute -left-6 top-3 w-3 h-3 rounded-full border-2 border-surface bg-status-documented"></div>
+<div class="bg-diagnostic-node-bg border border-outline-variant rounded-lg p-3 flex flex-col gap-2">
+<div class="flex justify-between items-start">
+<span class="font-env-tag text-env-tag text-status-documented bg-surface-container-high px-2 py-0.5 rounded border border-outline-variant/50">STEP 1</span>
+<span class="font-code-block text-[11px] text-outline">0.4s</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface">Parsing stack trace &amp; identifying service origin.</p>
+</div>
+</div>
+<!-- Node 2 (Active/Investigating) -->
+<div class="relative z-10">
+<div class="absolute -left-[25px] top-3 w-[14px] h-[14px] rounded-full border-2 border-surface bg-evidence-blue animate-pulse"></div>
+<div class="bg-diagnostic-node-bg border border-evidence-blue/50 rounded-lg p-3 flex flex-col gap-2 relative overflow-hidden">
+<div class="absolute left-0 top-0 bottom-0 w-1 bg-evidence-blue"></div>
+<div class="flex justify-between items-start pl-2">
+<span class="font-env-tag text-env-tag text-evidence-blue bg-evidence-blue/10 px-2 py-0.5 rounded border border-evidence-blue/20">STEP 2</span>
+<span class="material-symbols-outlined text-evidence-blue text-[16px] animate-spin">sync</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface pl-2">Checking cluster health metrics via Datadog API.</p>
+<div class="pl-2 mt-1 font-code-block text-code-block text-outline text-[11px] truncate">
+                            GET /api/v1/query?query=avg:kubernetes...
+                        </div>
+</div>
+</div>
+<!-- Node 3 (Pending) -->
+<div class="relative z-10 opacity-50">
+<div class="absolute -left-6 top-3 w-3 h-3 rounded-full border-2 border-surface bg-outline-variant"></div>
+<div class="bg-surface-container border border-outline-variant/50 border-dashed rounded-lg p-3">
+<p class="font-body-sm text-body-sm text-on-surface-variant">Isolate root cause network partition.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Top Playbooks -->
+<section class="px-gutter py-8">
+<div class="flex justify-between items-center mb-6">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2 uppercase tracking-wider">
+<span class="material-symbols-outlined text-[16px]">library_books</span>
+                    Featured Playbooks
+                </h2>
+<button class="font-body-sm text-body-sm text-primary hover:underline">View All</button>
+</div>
+<div class="flex flex-col gap-4">
+<!-- Playbook Card 1 -->
+<div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 flex flex-col gap-3 active:bg-surface-container transition-colors">
+<div class="flex justify-between items-start">
+<h3 class="font-headline-md text-[18px] leading-[24px] font-semibold text-on-surface w-4/5">Postgres Connection Pool Exhaustion</h3>
+<span class="material-symbols-outlined text-status-confirmed filled-icon">verified</span>
+</div>
+<div class="flex gap-2 flex-wrap">
+<span class="font-env-tag text-[10px] text-on-tertiary-container bg-tertiary-container/20 px-2 py-0.5 rounded border border-tertiary-container/30 uppercase">Database</span>
+<span class="font-env-tag text-[10px] text-on-secondary-container bg-secondary-container/20 px-2 py-0.5 rounded border border-secondary-container/30 uppercase">High Sev</span>
+</div>
+<div class="flex justify-between items-end mt-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-outline">group</span>
+<span class="font-body-sm text-[12px] text-on-surface-variant">4.2k runs</span>
+</div>
+<button class="p-2 rounded-full bg-surface-container-highest hover:bg-primary-container hover:text-on-primary-container transition-colors text-primary border border-outline-variant">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+</button>
+</div>
+</div>
+<!-- Playbook Card 2 -->
+<div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 flex flex-col gap-3 active:bg-surface-container transition-colors">
+<div class="flex justify-between items-start">
+<h3 class="font-headline-md text-[18px] leading-[24px] font-semibold text-on-surface w-4/5">Redis Cache Miss Spike Detection</h3>
+</div>
+<div class="flex gap-2 flex-wrap">
+<span class="font-env-tag text-[10px] text-on-primary-container bg-primary-container/20 px-2 py-0.5 rounded border border-primary-container/30 uppercase">Caching</span>
+<span class="font-env-tag text-[10px] text-outline bg-surface-container-highest px-2 py-0.5 rounded border border-outline-variant uppercase">Standard</span>
+</div>
+<div class="flex justify-between items-end mt-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-outline">group</span>
+<span class="font-body-sm text-[12px] text-on-surface-variant">1.8k runs</span>
+</div>
+<button class="p-2 rounded-full bg-surface-container-highest hover:bg-primary-container hover:text-on-primary-container transition-colors text-primary border border-outline-variant">
+<span class="material-symbols-outlined text-[18px]">play_arrow</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Simplified Footer -->
+<footer class="bg-surface-container-lowest border-t border-outline-variant py-6 px-gutter mt-auto flex flex-col items-center gap-4">
+<div class="font-headline-md text-[16px] font-bold text-outline">ITISYOU v2.4.0</div>
+<div class="flex gap-6 font-body-sm text-body-sm text-on-surface-variant">
+<a class="hover:text-primary transition-colors" href="#">Docs</a>
+<a class="hover:text-primary transition-colors" href="#">API</a>
+<a class="hover:text-primary transition-colors" href="#">Status</a>
+</div>
+</footer>
+</body></html>
