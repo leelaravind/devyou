@@ -9,6 +9,24 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const baseURL = process.env.BASE_URL ?? "https://dev-staging.itisyou.app";
 
+/**
+ * `RESOLVE_HOST=dev.itisyou.app:172.67.160.23` maps a hostname to an address inside
+ * the browser, bypassing the machine's resolver.
+ *
+ * It exists for one situation, and it is a real one: a hostname that has just been
+ * created resolves publicly minutes before a local or ISP resolver stops serving the
+ * negative answer it cached. Without this, verifying a fresh production deployment
+ * means waiting on a cache that has nothing to do with the deployment.
+ *
+ * It is opt-in and never set by default, because a suite that quietly resolves its
+ * own DNS is a suite that keeps passing after the DNS record is deleted.
+ */
+const resolveHost = process.env.RESOLVE_HOST;
+
+const launchOptions = resolveHost
+  ? { args: [`--host-resolver-rules=MAP ${resolveHost.split(":")[0]} ${resolveHost.split(":")[1]}`] }
+  : {};
+
 export default defineConfig({
   testDir: "./specs",
   fullyParallel: true,
@@ -28,11 +46,11 @@ export default defineConfig({
   projects: [
     {
       name: "desktop",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
+      use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 }, launchOptions },
     },
     {
       name: "mobile",
-      use: { ...devices["Desktop Chrome"], viewport: { width: 390, height: 844 } },
+      use: { ...devices["Desktop Chrome"], viewport: { width: 390, height: 844 }, launchOptions },
     },
   ],
 });

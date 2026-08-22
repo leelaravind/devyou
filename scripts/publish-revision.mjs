@@ -157,6 +157,18 @@ for (const [index, source] of (spec.sources ?? []).entries()) {
              ${q(source.publisher ?? null)}, ${NOW});`,
     `INSERT OR IGNORE INTO revision_source_references (revision_id, source_reference_id, node_id)
      VALUES (${q(revisionId)}, ${q(sourceId)}, NULL);`,
+    /*
+      An `official_reference` evidence record per cited source, so the confidence
+      row's count is derived from records rather than asserted from an array length.
+      `deriveConfidenceBand` reads that count on the path to `moderate_evidence`, and
+      `recomputeConfidence` rebuilds it from `evidence_records` — a count with no
+      records behind it was both unbacked and would have vanished on the first
+      reproduction.
+    */
+    `INSERT OR IGNORE INTO evidence_records
+       (id, revision_id, evidence_type, result, actor_id, source_reference_id, created_at)
+     VALUES (${q(`evd_${key}_ref${index}`)}, ${q(revisionId)}, 'official_reference', 'passed',
+             ${q(SEED_AUTHOR_ID)}, ${q(sourceId)}, ${NOW});`,
   );
 }
 

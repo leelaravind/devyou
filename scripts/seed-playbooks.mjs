@@ -212,6 +212,31 @@ for (const playbook of pending) {
     );
   }
 
+    /*
+      An `official_reference` evidence record per cited source.
+
+      The confidence row's `official_references` count used to be written straight
+      from the number of source links, with no evidence record behind it. That is the
+      exact failure this product exists to prevent — a number asserted rather than
+      derived. It was not merely cosmetic: `deriveConfidenceBand` reads
+      `officialReferences` on the path that promotes a revision to `moderate_evidence`,
+      and `recomputeConfidence` would have silently reset the count to zero on the
+      first real reproduction, so the figure was both unbacked and unstable.
+
+      Each record is a true claim: this revision cites this piece of official
+      documentation. It supports the cause the playbook names, never the procedure —
+      `explainConfidence` says so in those words, and the band thresholds keep it away
+      from anything reproduction-shaped.
+    */
+  for (const [index, _source] of (playbook.sources ?? []).entries()) {
+    statements.push(
+      `INSERT OR IGNORE INTO evidence_records
+         (id, revision_id, evidence_type, result, actor_id, source_reference_id, created_at)
+       VALUES ('evd_${key}_ref${index}', '${revisionId}', 'official_reference', 'passed',
+               '${SEED_AUTHOR.id}', 'src_${key}_${index}', ${PUBLISHED_AT});`,
+    );
+  }
+
   // Publish, then record the author's own documentation as the only evidence.
   statements.push(
     `UPDATE playbook_revisions SET status = 'published', published_at = ${PUBLISHED_AT}
