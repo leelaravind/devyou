@@ -1,0 +1,545 @@
+{
+  "$comment": "DevYou technology taxonomy seed data. Loaded into `technologies`, `technology_aliases` and `versions` (see packages/db/src/schema/taxonomy.ts). `type` must be a value from TECHNOLOGY_TYPES in packages/core/src/vocabulary.ts. Scope is deliberately narrow per IMPLEMENTATION.md §20: Cloudflare/edge runtime, PostgreSQL/database concurrency, and Docker/Kubernetes deployment and networking, plus the runtimes and OSes those sit on. See README.md in this directory for how this file is applied and why `slug` is permanent once seeded.",
+  "technologies": [
+    {
+      "slug": "cloudflare-workers",
+      "name": "Cloudflare Workers",
+      "type": "cloud",
+      "officialUrl": "https://developers.cloudflare.com/workers/",
+      "aliases": [
+        { "alias": "Workers", "kind": "name" },
+        { "alias": "workerd", "kind": "binary" },
+        { "alias": "wrangler", "kind": "binary" },
+        { "alias": "Error 1101", "kind": "error_token" },
+        { "alias": "Error 1102", "kind": "error_token" },
+        { "alias": "Error 1015", "kind": "error_token" },
+        { "alias": "Worker exceeded CPU time limit", "kind": "error_token" },
+        { "alias": "Cannot perform I/O on behalf of a different request", "kind": "error_token" },
+        { "alias": "cloudflare:workers", "kind": "import_path" },
+        { "alias": "@cloudflare/workers-types", "kind": "package" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "cloudflare-d1",
+      "name": "Cloudflare D1",
+      "type": "cloud",
+      "officialUrl": "https://developers.cloudflare.com/d1/",
+      "aliases": [
+        { "alias": "D1", "kind": "name" },
+        { "alias": "SQLITE_BUSY", "kind": "error_token" },
+        { "alias": "D1_ERROR", "kind": "error_token" },
+        { "alias": "SQLITE_CONSTRAINT", "kind": "error_token" },
+        { "alias": "Too many API requests by single worker invocation", "kind": "error_token" },
+        { "alias": "SQLITE_ERROR: no such table", "kind": "error_token" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "cloudflare-r2",
+      "name": "Cloudflare R2",
+      "type": "cloud",
+      "officialUrl": "https://developers.cloudflare.com/r2/",
+      "aliases": [
+        { "alias": "R2", "kind": "name" },
+        { "alias": "NoSuchKey", "kind": "error_token" },
+        { "alias": "AccessDenied", "kind": "error_token" },
+        { "alias": "SignatureDoesNotMatch", "kind": "error_token" },
+        { "alias": "EntityTooLarge", "kind": "error_token" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "cloudflare-workers-kv",
+      "name": "Cloudflare Workers KV",
+      "type": "cloud",
+      "officialUrl": "https://developers.cloudflare.com/kv/",
+      "aliases": [
+        { "alias": "Workers KV", "kind": "name" },
+        { "alias": "KV namespace", "kind": "name" },
+        { "alias": "exceeds limit of 25165824", "kind": "error_token" },
+        { "alias": "429 Too Many Requests", "kind": "error_token" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "cloudflare-durable-objects",
+      "name": "Cloudflare Durable Objects",
+      "type": "cloud",
+      "officialUrl": "https://developers.cloudflare.com/durable-objects/",
+      "aliases": [
+        { "alias": "Durable Objects", "kind": "name" },
+        { "alias": "DO", "kind": "name" },
+        { "alias": "Durable Object reset because its code was updated", "kind": "error_token" },
+        { "alias": "Durable Object storage operation exceeded timeout", "kind": "error_token" },
+        { "alias": "cloudflare:workers", "kind": "import_path" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "cloudflare-queues",
+      "name": "Cloudflare Queues",
+      "type": "cloud",
+      "officialUrl": "https://developers.cloudflare.com/queues/",
+      "aliases": [
+        { "alias": "Cloudflare Queues", "kind": "name" },
+        { "alias": "Queues", "kind": "name" },
+        { "alias": "429 Too Many Requests", "kind": "error_token" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "cloudflare-hyperdrive",
+      "name": "Cloudflare Hyperdrive",
+      "type": "cloud",
+      "officialUrl": "https://developers.cloudflare.com/hyperdrive/",
+      "aliases": [
+        { "alias": "Hyperdrive", "kind": "name" },
+        { "alias": "Hyperdrive was unable to connect to the origin database", "kind": "error_token" },
+        { "alias": "ETIMEDOUT", "kind": "error_token" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "cloudflare-pages",
+      "name": "Cloudflare Pages",
+      "type": "cloud",
+      "officialUrl": "https://developers.cloudflare.com/pages/",
+      "aliases": [
+        { "alias": "Cloudflare Pages", "kind": "name" },
+        { "alias": "Pages only supports files up to 25 MiB in size", "kind": "error_token" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "wrangler",
+      "name": "Wrangler",
+      "type": "tool",
+      "officialUrl": "https://developers.cloudflare.com/workers/wrangler/",
+      "aliases": [
+        { "alias": "wrangler", "kind": "binary" },
+        { "alias": "A request to the Cloudflare API failed", "kind": "error_token" },
+        { "alias": "Missing entry-point to Worker script", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "3", "semver": "00003.00000.00000", "isMinorOrMajor": true },
+        { "label": "4", "semver": "00004.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "miniflare",
+      "name": "Miniflare",
+      "type": "tool",
+      "officialUrl": "https://miniflare.dev/",
+      "aliases": [
+        { "alias": "Miniflare", "kind": "name" },
+        { "alias": "miniflare", "kind": "package" }
+      ],
+      "versions": [
+        { "label": "2", "semver": "00002.00000.00000", "isMinorOrMajor": true },
+        { "label": "3", "semver": "00003.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "docker",
+      "name": "Docker",
+      "type": "tool",
+      "officialUrl": "https://docs.docker.com/",
+      "aliases": [
+        { "alias": "docker", "kind": "binary" },
+        { "alias": "dockerd", "kind": "binary" },
+        { "alias": "Cannot connect to the Docker daemon", "kind": "error_token" },
+        { "alias": "no space left on device", "kind": "error_token" },
+        { "alias": "port is already allocated", "kind": "error_token" },
+        { "alias": "pull access denied", "kind": "error_token" },
+        { "alias": "exec format error", "kind": "error_token" },
+        { "alias": "OCI runtime create failed", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "24", "semver": "00024.00000.00000", "isMinorOrMajor": true },
+        { "label": "25", "semver": "00025.00000.00000", "isMinorOrMajor": true },
+        { "label": "26", "semver": "00026.00000.00000", "isMinorOrMajor": true },
+        { "label": "27", "semver": "00027.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "docker-compose",
+      "name": "Docker Compose",
+      "type": "tool",
+      "officialUrl": "https://docs.docker.com/compose/",
+      "aliases": [
+        { "alias": "docker-compose", "kind": "binary" },
+        { "alias": "docker compose", "kind": "name" },
+        { "alias": "no configuration file provided: not found", "kind": "error_token" },
+        { "alias": "Couldn't connect to Docker daemon", "kind": "error_token" },
+        { "alias": "Cannot start service", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "2", "semver": "00002.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "kubernetes",
+      "name": "Kubernetes",
+      "type": "tool",
+      "officialUrl": "https://kubernetes.io/",
+      "aliases": [
+        { "alias": "Kubernetes", "kind": "name" },
+        { "alias": "k8s", "kind": "name" },
+        { "alias": "CrashLoopBackOff", "kind": "error_token" },
+        { "alias": "ImagePullBackOff", "kind": "error_token" },
+        { "alias": "OOMKilled", "kind": "error_token" },
+        { "alias": "Error: ErrImagePull", "kind": "error_token" },
+        { "alias": "FailedScheduling", "kind": "error_token" },
+        { "alias": "Insufficient cpu", "kind": "error_token" },
+        { "alias": "back-off restarting failed container", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "1.31", "semver": "00001.00031.00000", "isMinorOrMajor": true },
+        { "label": "1.32", "semver": "00001.00032.00000", "isMinorOrMajor": true },
+        { "label": "1.33", "semver": "00001.00033.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "kubectl",
+      "name": "kubectl",
+      "type": "tool",
+      "officialUrl": "https://kubernetes.io/docs/reference/kubectl/",
+      "aliases": [
+        { "alias": "kubectl", "kind": "binary" },
+        { "alias": "error: You must be logged in to the server (Unauthorized)", "kind": "error_token" },
+        { "alias": "the server doesn't have a resource type", "kind": "error_token" },
+        { "alias": "Unable to connect to the server: dial tcp", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "1.31", "semver": "00001.00031.00000", "isMinorOrMajor": true },
+        { "label": "1.32", "semver": "00001.00032.00000", "isMinorOrMajor": true },
+        { "label": "1.33", "semver": "00001.00033.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "helm",
+      "name": "Helm",
+      "type": "tool",
+      "officialUrl": "https://helm.sh/",
+      "aliases": [
+        { "alias": "helm", "kind": "binary" },
+        { "alias": "Error: INSTALLATION FAILED", "kind": "error_token" },
+        { "alias": "Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress", "kind": "error_token" },
+        { "alias": "Error: could not find a ready tiller pod", "kind": "error_token" },
+        { "alias": "Error: release: not found", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "2", "semver": "00002.00000.00000", "isMinorOrMajor": true },
+        { "label": "3", "semver": "00003.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "pgbouncer",
+      "name": "PgBouncer",
+      "type": "tool",
+      "officialUrl": "https://www.pgbouncer.org/",
+      "aliases": [
+        { "alias": "pgbouncer", "kind": "binary" },
+        { "alias": "no more connections allowed (max_client_conn)", "kind": "error_token" },
+        { "alias": "server login has been failing, cached error", "kind": "error_token" },
+        { "alias": "prepared statement does not exist", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "1.21", "semver": "00001.00021.00000", "isMinorOrMajor": true },
+        { "label": "1.22", "semver": "00001.00022.00000", "isMinorOrMajor": true },
+        { "label": "1.23", "semver": "00001.00023.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "nginx-ingress-controller",
+      "name": "NGINX Ingress Controller",
+      "type": "tool",
+      "officialUrl": "https://kubernetes.github.io/ingress-nginx/",
+      "aliases": [
+        { "alias": "ingress-nginx", "kind": "name" },
+        { "alias": "NGINX Ingress Controller", "kind": "name" },
+        { "alias": "504 Gateway Time-out", "kind": "error_token" },
+        { "alias": "upstream sent too big header while reading response header from upstream", "kind": "error_token" },
+        { "alias": "no live upstreams", "kind": "error_token" },
+        { "alias": "connect() failed (111: Connection refused) while connecting to upstream", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "1.10", "semver": "00001.00010.00000", "isMinorOrMajor": true },
+        { "label": "1.11", "semver": "00001.00011.00000", "isMinorOrMajor": true },
+        { "label": "1.12", "semver": "00001.00012.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "coredns",
+      "name": "CoreDNS",
+      "type": "tool",
+      "officialUrl": "https://coredns.io/",
+      "aliases": [
+        { "alias": "coredns", "kind": "binary" },
+        { "alias": "SERVFAIL", "kind": "error_token" },
+        { "alias": "plugin/loop", "kind": "error_token" },
+        { "alias": "i/o timeout", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "1.10", "semver": "00001.00010.00000", "isMinorOrMajor": true },
+        { "label": "1.11", "semver": "00001.00011.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "docker-buildx",
+      "name": "Docker Buildx / BuildKit",
+      "type": "tool",
+      "officialUrl": "https://docs.docker.com/build/",
+      "aliases": [
+        { "alias": "BuildKit", "kind": "name" },
+        { "alias": "buildx", "kind": "binary" },
+        { "alias": "buildkitd", "kind": "binary" },
+        { "alias": "failed to solve with frontend dockerfile.v0", "kind": "error_token" },
+        { "alias": "failed to solve: process", "kind": "error_token" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "nodejs",
+      "name": "Node.js",
+      "type": "runtime",
+      "officialUrl": "https://nodejs.org/",
+      "aliases": [
+        { "alias": "Node.js", "kind": "name" },
+        { "alias": "node", "kind": "binary" },
+        { "alias": "ECONNREFUSED", "kind": "error_token" },
+        { "alias": "ERR_MODULE_NOT_FOUND", "kind": "error_token" },
+        { "alias": "MaxListenersExceededWarning", "kind": "error_token" },
+        { "alias": "Cannot find module", "kind": "error_token" },
+        { "alias": "JavaScript heap out of memory", "kind": "error_token" },
+        { "alias": "EADDRINUSE", "kind": "error_token" },
+        { "alias": "UnhandledPromiseRejectionWarning", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "18", "semver": "00018.00000.00000", "isMinorOrMajor": true },
+        { "label": "20", "semver": "00020.00000.00000", "isMinorOrMajor": true },
+        { "label": "22", "semver": "00022.00000.00000", "isMinorOrMajor": true },
+        { "label": "24", "semver": "00024.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "bun",
+      "name": "Bun",
+      "type": "runtime",
+      "officialUrl": "https://bun.sh/",
+      "aliases": [
+        { "alias": "Bun", "kind": "name" },
+        { "alias": "bun", "kind": "binary" },
+        { "alias": "error: Cannot find module", "kind": "error_token" },
+        { "alias": "panic(main thread):", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "1.0", "semver": "00001.00000.00000", "isMinorOrMajor": true },
+        { "label": "1.1", "semver": "00001.00001.00000", "isMinorOrMajor": true },
+        { "label": "1.2", "semver": "00001.00002.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "v8",
+      "name": "V8",
+      "type": "runtime",
+      "officialUrl": "https://v8.dev/",
+      "aliases": [
+        { "alias": "V8", "kind": "name" },
+        { "alias": "Allocation failed - JavaScript heap out of memory", "kind": "error_token" },
+        { "alias": "Maximum call stack size exceeded", "kind": "error_token" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "containerd",
+      "name": "containerd",
+      "type": "runtime",
+      "officialUrl": "https://containerd.io/",
+      "aliases": [
+        { "alias": "containerd", "kind": "binary" },
+        { "alias": "ctr", "kind": "binary" },
+        { "alias": "failed to create containerd task", "kind": "error_token" },
+        { "alias": "context deadline exceeded", "kind": "error_token" },
+        { "alias": "failed to get sandbox image", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "1.6", "semver": "00001.00006.00000", "isMinorOrMajor": true },
+        { "label": "1.7", "semver": "00001.00007.00000", "isMinorOrMajor": true },
+        { "label": "2.0", "semver": "00002.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "alpine-linux",
+      "name": "Alpine Linux",
+      "type": "os",
+      "officialUrl": "https://alpinelinux.org/",
+      "aliases": [
+        { "alias": "Alpine Linux", "kind": "name" },
+        { "alias": "apk", "kind": "binary" },
+        { "alias": "getaddrinfo EAI_AGAIN", "kind": "error_token" },
+        { "alias": "Error loading shared library ld-linux-x86-64.so.2", "kind": "error_token" },
+        { "alias": "ERROR: unable to select packages", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "3.19", "semver": "00003.00019.00000", "isMinorOrMajor": true },
+        { "label": "3.20", "semver": "00003.00020.00000", "isMinorOrMajor": true },
+        { "label": "3.21", "semver": "00003.00021.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "debian",
+      "name": "Debian",
+      "type": "os",
+      "officialUrl": "https://www.debian.org/",
+      "aliases": [
+        { "alias": "Debian", "kind": "name" },
+        { "alias": "bookworm", "kind": "name" },
+        { "alias": "bullseye", "kind": "name" },
+        { "alias": "E: Unable to locate package", "kind": "error_token" },
+        { "alias": "Could not get lock /var/lib/dpkg/lock-frontend", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "11 (bullseye)", "semver": "00011.00000.00000", "isMinorOrMajor": true },
+        { "label": "12 (bookworm)", "semver": "00012.00000.00000", "isMinorOrMajor": true },
+        { "label": "13 (trixie)", "semver": "00013.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "ubuntu",
+      "name": "Ubuntu",
+      "type": "os",
+      "officialUrl": "https://ubuntu.com/",
+      "aliases": [
+        { "alias": "Ubuntu", "kind": "name" },
+        { "alias": "Unable to acquire the dpkg frontend lock", "kind": "error_token" },
+        { "alias": "System has not been booted with systemd", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "20.04 LTS", "semver": "00020.00004.00000", "isMinorOrMajor": true },
+        { "label": "22.04 LTS", "semver": "00022.00004.00000", "isMinorOrMajor": true },
+        { "label": "24.04 LTS", "semver": "00024.00004.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "postgresql",
+      "name": "PostgreSQL",
+      "type": "database",
+      "officialUrl": "https://www.postgresql.org/",
+      "aliases": [
+        { "alias": "PostgreSQL", "kind": "name" },
+        { "alias": "Postgres", "kind": "name" },
+        { "alias": "psql", "kind": "binary" },
+        { "alias": "pg_ctl", "kind": "binary" },
+        { "alias": "postgres", "kind": "binary" },
+        { "alias": "SQLSTATE 40001", "kind": "error_token" },
+        { "alias": "SQLSTATE 40P01", "kind": "error_token" },
+        { "alias": "SQLSTATE 23505", "kind": "error_token" },
+        { "alias": "deadlock detected", "kind": "error_token" },
+        { "alias": "too many clients already", "kind": "error_token" },
+        { "alias": "canceling statement due to statement timeout", "kind": "error_token" },
+        { "alias": "could not serialize access due to concurrent update", "kind": "error_token" },
+        { "alias": "current transaction is aborted, commands ignored until end of transaction block", "kind": "error_token" },
+        { "alias": "duplicate key value violates unique constraint", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "15", "semver": "00015.00000.00000", "isMinorOrMajor": true },
+        { "label": "16", "semver": "00016.00000.00000", "isMinorOrMajor": true },
+        { "label": "17", "semver": "00017.00000.00000", "isMinorOrMajor": true },
+        { "label": "18", "semver": "00018.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "supabase",
+      "name": "Supabase",
+      "type": "service",
+      "officialUrl": "https://supabase.com/",
+      "aliases": [
+        { "alias": "Supabase", "kind": "name" },
+        { "alias": "new row violates row-level security policy", "kind": "error_token" },
+        { "alias": "JWT expired", "kind": "error_token" },
+        { "alias": "PGRST301", "kind": "error_token" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "neon",
+      "name": "Neon",
+      "type": "service",
+      "officialUrl": "https://neon.tech/",
+      "aliases": [
+        { "alias": "Neon", "kind": "name" },
+        { "alias": "Neon Postgres", "kind": "name" },
+        { "alias": "@neondatabase/serverless", "kind": "package" },
+        { "alias": "All attempts to open a WebSocket to connect to the database failed", "kind": "error_token" }
+      ],
+      "versions": []
+    },
+    {
+      "slug": "node-postgres",
+      "name": "node-postgres (pg)",
+      "type": "library",
+      "officialUrl": "https://node-postgres.com/",
+      "aliases": [
+        { "alias": "node-postgres", "kind": "name" },
+        { "alias": "pg", "kind": "package" },
+        { "alias": "Connection terminated unexpectedly", "kind": "error_token" },
+        { "alias": "timeout exceeded when trying to connect", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "8", "semver": "00008.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "postgres-js",
+      "name": "postgres.js",
+      "type": "library",
+      "officialUrl": "https://github.com/porsager/postgres",
+      "aliases": [
+        { "alias": "postgres.js", "kind": "name" },
+        { "alias": "postgres", "kind": "package" },
+        { "alias": "Connection ended unexpectedly", "kind": "error_token" },
+        { "alias": "prepared statement already exists", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "3", "semver": "00003.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "prisma",
+      "name": "Prisma",
+      "type": "library",
+      "officialUrl": "https://www.prisma.io/",
+      "aliases": [
+        { "alias": "Prisma", "kind": "name" },
+        { "alias": "prisma", "kind": "binary" },
+        { "alias": "@prisma/client", "kind": "package" },
+        { "alias": "PrismaClientInitializationError", "kind": "error_token" },
+        { "alias": "PrismaClientKnownRequestError", "kind": "error_token" },
+        { "alias": "Error: P1001", "kind": "error_token" },
+        { "alias": "Error: P2002", "kind": "error_token" },
+        { "alias": "Error: P2025", "kind": "error_token" }
+      ],
+      "versions": [
+        { "label": "5", "semver": "00005.00000.00000", "isMinorOrMajor": true },
+        { "label": "6", "semver": "00006.00000.00000", "isMinorOrMajor": true }
+      ]
+    },
+    {
+      "slug": "drizzle-orm",
+      "name": "Drizzle ORM",
+      "type": "library",
+      "officialUrl": "https://orm.drizzle.team/",
+      "aliases": [
+        { "alias": "Drizzle ORM", "kind": "name" },
+        { "alias": "drizzle-orm", "kind": "package" },
+        { "alias": "drizzle-kit", "kind": "package" },
+        { "alias": "drizzle-orm/sqlite-core", "kind": "import_path" },
+        { "alias": "drizzle-orm/pg-core", "kind": "import_path" },
+        { "alias": "DrizzleError", "kind": "error_token" }
+      ],
+      "versions": []
+    }
+  ]
+}

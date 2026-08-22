@@ -1,5 +1,5 @@
 {
-  "extends": "../config/tsconfig/lib.json",
+  "extends": "../config/tsconfig/worker-lib.json",
   "include": [
     "src/**/*"
   ]

@@ -10,8 +10,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --passWithNoTests",
-    "test:unit": "vitest run --passWithNoTests"
+    "test": "vitest run",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@devyou/core": "workspace:*"
@@ -19,6 +19,7 @@
   "devDependencies": {
     "@devyou/config": "workspace:*",
     "typescript": "~5.9.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "@cloudflare/workers-types": "^5.20260818.1"
   }
 }

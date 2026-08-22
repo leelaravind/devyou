@@ -6,6 +6,7 @@
   "description": "Drizzle schema, SQL migrations and query helpers for D1",
   "exports": {
     ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts",
     "./*": "./src/*.ts"
   },
   "scripts": {
@@ -14,12 +15,15 @@
     "test:unit": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@devyou/core": "workspace:*"
+    "@devyou/core": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@devyou/config": "workspace:*",
     "typescript": "~5.9.3",
     "vitest": "^4.1.10",
-    "@cloudflare/workers-types": "^5.20260818.1"
+    "@cloudflare/workers-types": "^5.20260818.1",
+    "drizzle-kit": "^0.31.10"
   }
 }

@@ -26,9 +26,9 @@ A successful build is not `TESTED`. A successful `wrangler deploy` is not
 | Phase | Scope | State |
 |---|---|---|
 | 0 | Repository + existing-network audit | **VERIFIED** — gate passed |
-| 1 | Monorepo + design system | `NOT STARTED` |
-| 2 | Database and domain invariants | `NOT STARTED` |
-| 3 | Public landing + search baseline | `NOT STARTED` |
+| 1 | Monorepo + design system | **VERIFIED STAGING** (visual gate deferred — see below) |
+| 2 | Database and domain invariants | **VERIFIED STAGING** |
+| 3 | Public landing + search baseline | `IN PROGRESS` |
 | 4 | Playbook reader + diagnostic engine | `NOT STARTED` |
 | 5 | Environment + evidence UX | `NOT STARTED` |
 | 6 | Authentication + contributor identity | `NOT STARTED` |
@@ -41,8 +41,10 @@ A successful build is not `TESTED`. A successful `wrangler deploy` is not
 | 13 | Seed corpus + closed validation | `NOT STARTED` |
 | 14 | Staging freeze + launch gate | `NOT STARTED` |
 
-**Nothing is deployed. No Cloudflare resource has been created.** Every Cloudflare call
-made so far has been a `list` operation.
+**Deployed:** `devyou-app-staging` on `https://dev-staging.itisyou.app`.
+**Created:** the DevYou-owned Cloudflare resources listed in
+[`docs/implementation/CLOUDFLARE-RESOURCES.md`](docs/implementation/CLOUDFLARE-RESOURCES.md).
+No resource belonging to another product has been created, modified or deleted.
 
 ---
 
@@ -106,3 +108,107 @@ Phases 1–9 are unblocked by all three.
 `U-1` queues not enumerable · `U-2` whether `itisyou-root-edge` fronts subdomains ·
 `U-3` Cloudflare plan level vs `limits.cpu_ms` · `U-4` whether Vectorize is enabled ·
 `U-5` content licence. Full detail in the baseline document, §8.
+
+---
+
+## Phase 1 — Monorepo + design system
+
+**State: VERIFIED STAGING**, with one gate item deferred and named below.
+
+### Delivered
+
+pnpm + Turborepo workspace matching the network's conventions; twelve packages and the
+public app; the "Technical Precision" token layer rebuilt from
+`technical_precision/DESIGN.md` as a Tailwind 4 `@theme` over CSS variables, with a
+light palette that is a re-derivation rather than an inversion; thirteen UI primitives;
+the public Worker deployed to staging with its security headers and CSP nonce.
+
+### Evidence
+
+| Check | Result |
+|---|---|
+| `pnpm run lint` | ✅ clean |
+| `pnpm run typecheck` | ✅ 14/14 projects |
+| `pnpm run build` | ✅ |
+| Deployed | ✅ `https://dev-staging.itisyou.app` |
+| `/healthz` on the deployed Worker | ✅ 200, D1 reachable, content-bearing body |
+| CSP present with per-response nonce | ✅ every `<script>` carries it |
+| Server-rendered knowledge with JS disabled | ✅ page content present in the HTML |
+| Cache policy: public on `/`, `no-store` elsewhere | ✅ |
+
+### Gate item deferred, and why
+
+The plan's Phase 1 gate is a **visual review against the Stitch screenshots**. The
+browser automation available in this environment is not connected, so a screenshot
+comparison could not be run. It is deferred to Phase 12, where Playwright is set up —
+which is the better home for it anyway, because a visual check that only ever ran once
+by hand is not a check.
+
+**This is not recorded as passed.** Phase 1 is `VERIFIED STAGING` for everything above
+and explicitly *unverified* visually.
+
+### Reconciliations against the design package
+
+| Conflict | Resolution |
+|---|---|
+| `DESIGN.md` front-matter says `radius.DEFAULT = 0.25rem`; all nine rendered screens use `0.125rem` | The renders win — they are the acceptance baseline |
+| The landing screen loads only Inter and JetBrains Mono; seven of nine load Geist as well | Tri-font hierarchy kept, per `DESIGN.md` prose and the majority of screens |
+| Stitch uses the Material Symbols icon **font** | Replaced with inline SVG. An icon font is a third-party render-blocking request, and when it fails it renders the literal text `bug_report`. Icons here carry state, so they must be present when the state is |
+
+---
+
+## Phase 2 — Database and domain invariants
+
+**State: VERIFIED STAGING.** All four critical gate tests from plan §24 pass, against the
+deployed database as well as in CI.
+
+### Delivered
+
+Drizzle schema across six files covering every entity in plan §5; two migrations —
+the schema, and `0001_invariant_enforcement.sql` which is where the invariants stop
+being conventions; the domain rules as pure functions (confidence derivation, graph
+validation, session engine, revision lifecycle, environment matching); a migration
+runner, a reset script and an invariant verification script; the technology taxonomy
+seeded.
+
+### Gate evidence
+
+The plan names four critical gate tests. Each is asserted twice — once in CI against
+the real migrations inside `workerd`, and once against the deployed staging database
+with no application code in the path.
+
+| Plan §24 gate test | Result |
+|---|---|
+| A published revision cannot mutate in place | ✅ rejected by `trg_revision_content_immutable` |
+| Evidence remains tied to the old revision after an edit | ✅ new revision inherits zero evidence |
+| Failed reproductions remain queryable | ✅ retained and returned |
+| Branch graph validation rejects invalid edges | ✅ cross-revision edge rejected by `trg_edges_same_revision` |
+
+| Suite | Result |
+|---|---|
+| `scripts/verify-invariants.mjs --env staging --remote` | ✅ **19/19 invariants hold** against the deployed database |
+| `apps/app/test/invariants.test.ts` (workerd, real migrations) | ✅ 11/11 |
+| `packages/domain` unit tests | ✅ 64/64 |
+| `pnpm run typecheck` / `lint` / `test` | ✅ clean |
+
+Two of those checks are **positive controls** rather than prohibitions — lifecycle state
+must still move on a published revision, and an edge within a single draft revision must
+still be accepted. A guard that blocks everything is not a guard, it is an outage.
+
+### Two defects found and fixed during this phase
+
+1. **A verification-node dead end.** `verification` was in neither the branching set nor
+   the terminal set in `validateGraph`, so it was the one node type that could silently
+   be a dead end — on the node that asks "did the fix work?", where a reader answering
+   "no" is exactly who most needs a next step.
+2. **A verification script that passed for the wrong reason.** The cross-revision edge
+   check targeted a *published* revision, so it was rejected by the publication trigger
+   before the cross-revision trigger was consulted. Retargeted at a draft.
+
+### Taxonomy seeded
+
+33 technologies, 171 aliases, 52 versions across the three launch domains
+(Cloudflare/edge, PostgreSQL, Docker/Kubernetes) plus their runtimes and OSes. The
+aliases carry the error tokens that pasted output actually contains — `SQLITE_BUSY`,
+`CrashLoopBackOff`, `SQLSTATE 40001` — which is what lets a pasted error resolve to a
+technology at all.
