@@ -21,6 +21,7 @@ import { SURFACES } from "../app/lib/surfaces";
 const ROUTES_DIR = path.resolve(import.meta.dirname, "../app/routes");
 const APP_DIR = path.resolve(import.meta.dirname, "../app");
 const WORKER = path.resolve(import.meta.dirname, "../workers/app.ts");
+const WRANGLER = path.resolve(import.meta.dirname, "../wrangler.jsonc");
 
 const routeFiles = readdirSync(ROUTES_DIR).filter((name) => /\.tsx?$/.test(name));
 const read = (file: string) => readFileSync(path.join(ROUTES_DIR, file), "utf8");
@@ -134,5 +135,81 @@ describe("the capability matrix is never re-implemented", () => {
     expect(source, `${file}: use can(role, capability) from @devyou/auth`).not.toMatch(
       /role\s*===\s*["'](dev_admin|support_admin|reviewer)["']/,
     );
+  });
+});
+
+interface WranglerEnv {
+  workers_dev?: boolean;
+  preview_urls?: boolean;
+  assets?: { run_worker_first?: boolean };
+  routes?: { pattern: string }[];
+}
+
+describe("the deployment surface", () => {
+  /*
+    Three settings in `wrangler.jsonc` are security controls, and their own comments say so.
+    Nothing asserted them, which meant the perimeter had a class of hole that no test in
+    this repository could see: every guard above reasons about code reached *through* the
+    Access-gated hostname, and each of these settings creates a way to reach the Worker
+    without going through it.
+
+    Parsed rather than grepped. `"workers_dev": false` and a commented-out
+    `"workers_dev": true` are the same text to a grep and opposite deployments.
+
+    JSONC is reduced to JSON by hand because no JSONC parser is a dependency here, and
+    adding one to read a single file this repository controls is the larger change. The
+    three substitutions are block comments, whole-line comments and trailing commas. The
+    line-comment pattern is anchored to the start of a line precisely so the `https://`
+    inside the team-domain value survives it. If any of that is ever wrong, `JSON.parse`
+    throws and the suite fails loudly — the one outcome a security guard must not have is
+    passing because it could not read the file.
+  */
+  const config = JSON.parse(
+    readFileSync(WRANGLER, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "")
+      .replace(/,(\s*[}\]])/g, "$1"),
+  ) as WranglerEnv & { env?: Record<string, WranglerEnv> };
+
+  /*
+    Production is the top level of the file and every other environment is a key under
+    `env`, so both are checked by the same four assertions. That matters more than it
+    looks: `env.staging` does not inherit these settings from the top level — wrangler
+    requires each environment to restate them, and an environment that quietly omits
+    `workers_dev` gets the default, which is `true`.
+  */
+  const environments: [string, WranglerEnv][] = [
+    ["production", config],
+    ...Object.entries(config.env ?? {}),
+  ];
+
+  it.each(environments)("%s serves no workers.dev origin", (_name, cfg) => {
+    /*
+      A `workers.dev` hostname serves this same Worker on a hostname the Access application
+      does not cover. Access gates a hostname, not a Worker, so this one line is the
+      difference between a perimeter and a DNS record.
+    */
+    expect(cfg.workers_dev).toBe(false);
+  });
+
+  it.each(environments)("%s serves no preview URLs", (_name, cfg) => {
+    /* Same hole, one per deployment, generated automatically. */
+    expect(cfg.preview_urls).toBe(false);
+  });
+
+  it.each(environments)("%s runs the Worker before the asset router", (_name, cfg) => {
+    /*
+      Without this, a request matching a file in the assets directory is answered by
+      Cloudflare's asset server before the Worker runs — so the admin JavaScript is served
+      by code that never checked the assertion. The boundary test above proves the Worker
+      verifies before it touches ASSETS; this proves the Worker is reached at all.
+    */
+    expect(cfg.assets?.run_worker_first).toBe(true);
+  });
+
+  it.each(environments)("%s is routed only at its own admin hostname", (_name, cfg) => {
+    const patterns = (cfg.routes ?? []).map((route) => route.pattern);
+    expect(patterns.length).toBe(1);
+    expect(patterns[0]).toMatch(/^dev-admin(-\w+)?\.itisyou\.app$/);
   });
 });
