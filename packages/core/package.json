@@ -1,0 +1,22 @@
+{
+  "name": "@devyou/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared vocabulary and primitives: evidence types, confidence bands, safety classes, errors",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:unit": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@devyou/config": "workspace:*",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.10",
+    "@cloudflare/workers-types": "^5.20260818.1"
+  }
+}

@@ -1,0 +1,19 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "tests/e2e"
+
+# Explicit allow-list: only these dependencies may run install-time build scripts.
+# Everything else is denied by default. Supply-chain hardening, inherited from the
+# network convention -- the npm "Qix" incident injected malware into 18 packages
+# within ~16 minutes, and install scripts are how that reaches a developer machine.
+allowBuilds:
+  esbuild: true
+  workerd: true
+
+# Force a patched esbuild everywhere it appears transitively (GHSA-67mh-4wv8-2f99,
+# reachable only through drizzle-kit's deprecated @esbuild-kit/* chain, which never
+# ships to a Worker). Overridden anyway: an audit with a known finding in it is one
+# people stop reading.
+overrides:
+  esbuild: ">=0.25.0"

@@ -1,0 +1,42 @@
+{
+  "name": "devyou",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DevYou - public, cross-vendor, version-aware engineering troubleshooting playbooks on Cloudflare",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "cf-typegen": "turbo run cf-typegen",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
+    "db:migrate:local": "node scripts/apply-migrations.mjs --env staging --local",
+    "db:migrate:staging": "node scripts/apply-migrations.mjs --env staging --remote",
+    "db:migrate:production": "node scripts/apply-migrations.mjs --env production --remote",
+    "seed:local": "node scripts/seed.mjs --env staging --local",
+    "seed:staging": "node scripts/seed.mjs --env staging --remote",
+    "search:eval": "node scripts/search-eval.mjs",
+    "e2e:staging": "pnpm --filter @devyou/e2e run e2e:staging"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.19.1",
+    "eslint": "^10.8.1",
+    "globals": "^17.11.0",
+    "prettier": "^3.6.2",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "turbo": "^2.10.10",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.67.0"
+  }
+}

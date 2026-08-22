@@ -1,0 +1,25 @@
+{
+  "name": "@devyou/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Drizzle schema, SQL migrations and query helpers for D1",
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:unit": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@devyou/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@devyou/config": "workspace:*",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.10",
+    "@cloudflare/workers-types": "^5.20260818.1"
+  }
+}

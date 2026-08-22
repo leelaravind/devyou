@@ -1,0 +1,490 @@
+/**
+ * DevYou design tokens — "Technical Precision".
+ *
+ * Source of truth: docs/design/stitch/technical_precision/DESIGN.md, reconciled
+ * against the nine rendered Stitch screens. Where the specification and the render
+ * disagree, the render wins, because the renders are the visual-acceptance baseline.
+ * Both reconciliations are recorded in docs/design/DESIGN-SYSTEM.md.
+ *
+ * Structure, and why:
+ *
+ *   :root                       → the dark palette, as raw CSS variables
+ *   :root[data-theme="light"]   → the light palette, same variable names
+ *   @theme inline               → maps those variables into Tailwind utilities
+ *
+ * The indirection is what makes a runtime theme toggle possible at all. If the hex
+ * values lived directly in @theme, Tailwind would inline them at build time and
+ * switching themes would mean shipping two stylesheets.
+ */
+
+@import "tailwindcss";
+
+/* --------------------------------------------------------------------------
+   Dark palette — the default. DESIGN.md: "defaults to Dark Mode, utilizing a
+   'Deep Charcoal' palette to reduce eye strain during long debugging sessions."
+   -------------------------------------------------------------------------- */
+:root {
+  --dv-background: #0b1326;
+  --dv-on-background: #dae2fd;
+
+  --dv-surface: #0b1326;
+  --dv-surface-dim: #0b1326;
+  --dv-surface-bright: #31394d;
+  --dv-surface-container-lowest: #060e20;
+  --dv-surface-container-low: #131b2e;
+  --dv-surface-container: #171f33;
+  --dv-surface-container-high: #222a3d;
+  --dv-surface-container-highest: #2d3449;
+  --dv-surface-variant: #2d3449;
+  --dv-on-surface: #dae2fd;
+  --dv-on-surface-variant: #c2c6d6;
+  --dv-inverse-surface: #dae2fd;
+  --dv-inverse-on-surface: #283044;
+
+  --dv-outline: #8c909f;
+  --dv-outline-variant: #424754;
+
+  --dv-primary: #adc6ff;
+  --dv-on-primary: #002e6a;
+  --dv-primary-container: #4d8eff;
+  --dv-on-primary-container: #00285d;
+  --dv-inverse-primary: #005ac2;
+  --dv-surface-tint: #adc6ff;
+
+  --dv-secondary: #6bd8cb;
+  --dv-on-secondary: #003732;
+  --dv-secondary-container: #29a195;
+  --dv-on-secondary-container: #00302b;
+
+  --dv-tertiary: #ffb786;
+  --dv-on-tertiary: #502400;
+  --dv-tertiary-container: #df7412;
+  --dv-on-tertiary-container: #461f00;
+
+  --dv-error: #ffb4ab;
+  --dv-on-error: #690005;
+  --dv-error-container: #93000a;
+  --dv-on-error-container: #ffdad6;
+
+  /* ------------------------------------------------------------------------
+     The semantic layer. These are not decoration — each one names a distinct
+     fact in the evidence model, and nothing may re-use them for another meaning.
+
+     DESIGN.md's verification palette maps one-to-one onto the evidence types in
+     ADR-0006. If a new evidence type is added, it gets its own token here rather
+     than borrowing one that already means something else.
+     ------------------------------------------------------------------------ */
+  --dv-evidence-blue: #3b82f6; /* primary action; "this is evidence-backed"     */
+  --dv-technical-teal: #0d9488; /* secondary technical configuration              */
+  --dv-status-documented: #94a3b8; /* exists, not yet validated by anyone          */
+  --dv-status-confirmed: #818cf8; /* independent human confirmation                */
+  --dv-status-reproduced: #f472b6; /* reproduced in a declared environment          */
+  --dv-status-ci-verified: #34d399; /* automated/deterministic execution             */
+  --dv-warning-amber: #f59e0b; /* stale, needs reverification, state-changing   */
+  --dv-destructive-red: #ef4444; /* failed reproduction, destructive command      */
+  --dv-diagnostic-node-bg: #1e293b; /* diagnostic tree node fill                     */
+
+  color-scheme: dark;
+}
+
+/* --------------------------------------------------------------------------
+   Light palette. DESIGN.md: "Light mode uses a clean 'Zinc' scale."
+
+   Not an inversion. The tonal *roles* are preserved — container-lowest is still
+   the recessed layer, outline-variant is still the hairline — but the ramp runs
+   the other way and the accent hues are darkened to hold 4.5:1 against a light
+   ground. R-33 requires 4.5:1 minimum; a naive inversion of #adc6ff on white is
+   about 1.6:1 and would have failed it silently.
+   -------------------------------------------------------------------------- */
+:root[data-theme="light"] {
+  --dv-background: #fafafa;
+  --dv-on-background: #18181b;
+
+  --dv-surface: #fafafa;
+  --dv-surface-dim: #e4e4e7;
+  --dv-surface-bright: #ffffff;
+  --dv-surface-container-lowest: #ffffff;
+  --dv-surface-container-low: #f4f4f5;
+  --dv-surface-container: #ededf0;
+  --dv-surface-container-high: #e4e4e7;
+  --dv-surface-container-highest: #d4d4d8;
+  --dv-surface-variant: #e4e4e7;
+  --dv-on-surface: #18181b;
+  --dv-on-surface-variant: #52525b;
+  --dv-inverse-surface: #27272a;
+  --dv-inverse-on-surface: #f4f4f5;
+
+  --dv-outline: #71717a;
+  --dv-outline-variant: #d4d4d8;
+
+  --dv-primary: #1d4ed8;
+  --dv-on-primary: #ffffff;
+  --dv-primary-container: #dbeafe;
+  --dv-on-primary-container: #1e3a8a;
+  --dv-inverse-primary: #adc6ff;
+  --dv-surface-tint: #1d4ed8;
+
+  --dv-secondary: #0f766e;
+  --dv-on-secondary: #ffffff;
+  --dv-secondary-container: #ccfbf1;
+  --dv-on-secondary-container: #134e4a;
+
+  --dv-tertiary: #c2410c;
+  --dv-on-tertiary: #ffffff;
+  --dv-tertiary-container: #ffedd5;
+  --dv-on-tertiary-container: #7c2d12;
+
+  --dv-error: #b91c1c;
+  --dv-on-error: #ffffff;
+  --dv-error-container: #fee2e2;
+  --dv-on-error-container: #7f1d1d;
+
+  --dv-evidence-blue: #1d4ed8;
+  --dv-technical-teal: #0f766e;
+  --dv-status-documented: #52525b;
+  --dv-status-confirmed: #4338ca;
+  --dv-status-reproduced: #be185d;
+  --dv-status-ci-verified: #047857;
+  --dv-warning-amber: #b45309;
+  --dv-destructive-red: #b91c1c;
+  --dv-diagnostic-node-bg: #f4f4f5;
+
+  color-scheme: light;
+}
+
+/* Respect the OS preference when the user has expressed no explicit choice.
+   `data-theme` is only ever set by a deliberate toggle, so its absence means
+   "follow the system" rather than "force dark". */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --dv-background: #fafafa;
+    --dv-on-background: #18181b;
+    --dv-surface: #fafafa;
+    --dv-surface-dim: #e4e4e7;
+    --dv-surface-bright: #ffffff;
+    --dv-surface-container-lowest: #ffffff;
+    --dv-surface-container-low: #f4f4f5;
+    --dv-surface-container: #ededf0;
+    --dv-surface-container-high: #e4e4e7;
+    --dv-surface-container-highest: #d4d4d8;
+    --dv-surface-variant: #e4e4e7;
+    --dv-on-surface: #18181b;
+    --dv-on-surface-variant: #52525b;
+    --dv-inverse-surface: #27272a;
+    --dv-inverse-on-surface: #f4f4f5;
+    --dv-outline: #71717a;
+    --dv-outline-variant: #d4d4d8;
+    --dv-primary: #1d4ed8;
+    --dv-on-primary: #ffffff;
+    --dv-primary-container: #dbeafe;
+    --dv-on-primary-container: #1e3a8a;
+    --dv-inverse-primary: #adc6ff;
+    --dv-surface-tint: #1d4ed8;
+    --dv-secondary: #0f766e;
+    --dv-on-secondary: #ffffff;
+    --dv-secondary-container: #ccfbf1;
+    --dv-on-secondary-container: #134e4a;
+    --dv-tertiary: #c2410c;
+    --dv-on-tertiary: #ffffff;
+    --dv-tertiary-container: #ffedd5;
+    --dv-on-tertiary-container: #7c2d12;
+    --dv-error: #b91c1c;
+    --dv-on-error: #ffffff;
+    --dv-error-container: #fee2e2;
+    --dv-on-error-container: #7f1d1d;
+    --dv-evidence-blue: #1d4ed8;
+    --dv-technical-teal: #0f766e;
+    --dv-status-documented: #52525b;
+    --dv-status-confirmed: #4338ca;
+    --dv-status-reproduced: #be185d;
+    --dv-status-ci-verified: #047857;
+    --dv-warning-amber: #b45309;
+    --dv-destructive-red: #b91c1c;
+    --dv-diagnostic-node-bg: #f4f4f5;
+    color-scheme: light;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Tailwind theme. `inline` so the generated utilities reference the variables
+   above rather than baking in a value.
+   -------------------------------------------------------------------------- */
+@theme inline {
+  --color-background: var(--dv-background);
+  --color-on-background: var(--dv-on-background);
+
+  --color-surface: var(--dv-surface);
+  --color-surface-dim: var(--dv-surface-dim);
+  --color-surface-bright: var(--dv-surface-bright);
+  --color-surface-container-lowest: var(--dv-surface-container-lowest);
+  --color-surface-container-low: var(--dv-surface-container-low);
+  --color-surface-container: var(--dv-surface-container);
+  --color-surface-container-high: var(--dv-surface-container-high);
+  --color-surface-container-highest: var(--dv-surface-container-highest);
+  --color-surface-variant: var(--dv-surface-variant);
+  --color-on-surface: var(--dv-on-surface);
+  --color-on-surface-variant: var(--dv-on-surface-variant);
+  --color-inverse-surface: var(--dv-inverse-surface);
+  --color-inverse-on-surface: var(--dv-inverse-on-surface);
+
+  --color-outline: var(--dv-outline);
+  --color-outline-variant: var(--dv-outline-variant);
+
+  --color-primary: var(--dv-primary);
+  --color-on-primary: var(--dv-on-primary);
+  --color-primary-container: var(--dv-primary-container);
+  --color-on-primary-container: var(--dv-on-primary-container);
+  --color-inverse-primary: var(--dv-inverse-primary);
+  --color-surface-tint: var(--dv-surface-tint);
+
+  --color-secondary: var(--dv-secondary);
+  --color-on-secondary: var(--dv-on-secondary);
+  --color-secondary-container: var(--dv-secondary-container);
+  --color-on-secondary-container: var(--dv-on-secondary-container);
+
+  --color-tertiary: var(--dv-tertiary);
+  --color-on-tertiary: var(--dv-on-tertiary);
+  --color-tertiary-container: var(--dv-tertiary-container);
+  --color-on-tertiary-container: var(--dv-on-tertiary-container);
+
+  --color-error: var(--dv-error);
+  --color-on-error: var(--dv-on-error);
+  --color-error-container: var(--dv-error-container);
+  --color-on-error-container: var(--dv-on-error-container);
+
+  --color-evidence-blue: var(--dv-evidence-blue);
+  --color-technical-teal: var(--dv-technical-teal);
+  --color-status-documented: var(--dv-status-documented);
+  --color-status-confirmed: var(--dv-status-confirmed);
+  --color-status-reproduced: var(--dv-status-reproduced);
+  --color-status-ci-verified: var(--dv-status-ci-verified);
+  --color-warning-amber: var(--dv-warning-amber);
+  --color-destructive-red: var(--dv-destructive-red);
+  --color-diagnostic-node-bg: var(--dv-diagnostic-node-bg);
+
+  /* Typography. Three families, each with one job — DESIGN.md's tri-font
+     hierarchy. Geist for structure, Inter for prose, JetBrains Mono for anything
+     a machine produced: commands, versions, error text, evidence labels. */
+  --font-headline: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --text-headline-lg: 30px;
+  --text-headline-lg--line-height: 36px;
+  --text-headline-lg--letter-spacing: -0.02em;
+  --text-headline-lg--font-weight: 600;
+
+  --text-headline-md: 24px;
+  --text-headline-md--line-height: 32px;
+  --text-headline-md--font-weight: 600;
+
+  --text-body-md: 14px;
+  --text-body-md--line-height: 20px;
+  --text-body-md--font-weight: 400;
+
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 18px;
+  --text-body-sm--font-weight: 400;
+
+  --text-code-block: 13px;
+  --text-code-block--line-height: 20px;
+  --text-code-block--font-weight: 400;
+
+  --text-label-caps: 11px;
+  --text-label-caps--line-height: 16px;
+  --text-label-caps--letter-spacing: 0.05em;
+  --text-label-caps--font-weight: 700;
+
+  --text-env-tag: 12px;
+  --text-env-tag--line-height: 14px;
+  --text-env-tag--font-weight: 500;
+
+  /* Geometry. These values come from the rendered screens, not from DESIGN.md's
+     front-matter, which lists a scale one step softer. All nine renders agree on
+     0.125rem as the default, and the renders are the acceptance baseline. */
+  --radius-DEFAULT: 0.125rem;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.1875rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-node: 0.375rem; /* diagnostic nodes, deliberately distinct from buttons */
+  --radius-full: 9999px;
+
+  /* Spacing. 4px base with named steps for the two densities DESIGN.md calls for. */
+  --spacing-unit: 4px;
+  --spacing-density-compact: 4px;
+  --spacing-density-high: 8px;
+  --spacing-gutter: 16px;
+  --spacing-margin: 24px;
+
+  /* The sidebar is fixed at 280px "to maximize the central workspace for code and
+     diagnostic nodes" (DESIGN.md). Named so the split view and the shell cannot
+     drift apart. */
+  --spacing-sidebar: 280px;
+
+  /* R-36: the split view collapses to a stacked layout below 1024px. Declared as a
+     breakpoint so the rule lives in one place. */
+  --breakpoint-split: 1024px;
+}
+
+/* --------------------------------------------------------------------------
+   Base layer
+   -------------------------------------------------------------------------- */
+@layer base {
+  html {
+    font-family: var(--font-body);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-on-background);
+    font-size: var(--text-body-md);
+    line-height: var(--text-body-md--line-height);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-headline);
+  }
+
+  code,
+  kbd,
+  pre,
+  samp {
+    font-family: var(--font-mono);
+  }
+
+  /*
+    R-33: focus is a 2px solid high-contrast ring, not a subtle colour shift.
+
+    `:focus-visible` rather than `:focus` so a mouse click on a button does not
+    paint a ring, while every keyboard path does. The offset keeps the ring off
+    the element's own border, which on a 1px-bordered design would otherwise be
+    hard to distinguish from a hover state.
+  */
+  :focus-visible {
+    outline: 2px solid var(--color-evidence-blue);
+    outline-offset: 2px;
+    border-radius: var(--radius-DEFAULT);
+  }
+
+  /*
+    R-35. Not merely shortened — motion is removed. The diagnostic tree animates
+    on branch changes, and for a vestibular-sensitive user a fast animation is
+    still an animation.
+  */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* Code blocks must be keyboard-scrollable (plan §18). A `tabindex` in the markup
+     puts them in the tab order; this makes the resulting focus legible. */
+  pre:focus-visible {
+    outline-offset: 0;
+  }
+
+  ::selection {
+    background-color: var(--color-primary-container);
+    color: var(--color-on-primary-container);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Component-layer primitives that cannot be expressed as utilities
+   -------------------------------------------------------------------------- */
+@layer components {
+  /* Tree connectors. Hairlines rather than SVG so they inherit the theme variable
+     and cost nothing to render. */
+  .dv-tree-line-v {
+    width: 1px;
+    background-color: var(--color-outline-variant);
+    height: 24px;
+    margin-left: 20px;
+  }
+
+  .dv-tree-line-h {
+    height: 1px;
+    background-color: var(--color-outline-variant);
+    width: 24px;
+  }
+
+  /*
+    The failing-node pulse.
+
+    DESIGN.md asks for a "pulse stroke of destructive-red" on failed nodes. It is
+    decoration on top of a state that is *already* conveyed by the node's border
+    colour, its icon and its text label — so when it is suppressed by
+    prefers-reduced-motion, nothing is lost. That ordering is deliberate: colour
+    and motion are never the only carrier of state (R-34, plan §18).
+  */
+  .dv-node-pulse {
+    animation: dv-pulse-border 2s infinite;
+  }
+
+  @keyframes dv-pulse-border {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-destructive-red) 40%, transparent);
+    }
+    70% {
+      box-shadow: 0 0 0 4px transparent;
+    }
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+  }
+
+  /* The active diagnostic node's inner glow — a 2px inset left border. DESIGN.md:
+     "Elements are highlighted with a 2px left-border or a subtle inner-glow." */
+  .dv-node-active {
+    box-shadow: inset 2px 0 0 0 var(--color-primary);
+  }
+
+  /* Dense scrollbars, matching the IDE/observability reference the design cites. */
+  .dv-scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-outline-variant) transparent;
+  }
+
+  .dv-scroll-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .dv-scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .dv-scroll-thin::-webkit-scrollbar-thumb {
+    background: var(--color-outline-variant);
+    border-radius: 4px;
+  }
+
+  /* Skip link — visible only on focus, but genuinely visible then. */
+  .dv-skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+  }
+
+  .dv-skip-link:focus {
+    left: var(--spacing-margin);
+    top: var(--spacing-density-high);
+    padding: var(--spacing-density-high) var(--spacing-gutter);
+    background-color: var(--color-surface-container-high);
+    color: var(--color-on-surface);
+    border: 1px solid var(--color-outline);
+    border-radius: var(--radius-DEFAULT);
+  }
+}

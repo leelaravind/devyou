@@ -1,0 +1,8 @@
+# Normalise line endings. Without this, every file written on Windows produces a
+# CRLF warning on `git add`, and warning noise is how a real warning gets missed.
+* text=auto eol=lf
+
+*.png binary
+*.pdf binary
+*.zip binary
+pnpm-lock.yaml -diff linguist-generated

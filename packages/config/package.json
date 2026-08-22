@@ -1,0 +1,18 @@
+{
+  "name": "@devyou/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig/base": "./tsconfig/base.json",
+    "./tsconfig/lib": "./tsconfig/lib.json",
+    "./tsconfig/react": "./tsconfig/react.json",
+    "./tsconfig/worker": "./tsconfig/worker.json",
+    "./tsconfig/worker-lib": "./tsconfig/worker-lib.json"
+  },
+  "scripts": {
+    "typecheck": "echo \"[config] no typecheck\"",
+    "test": "echo \"[config] no tests\"",
+    "test:unit": "echo \"[config] no tests\""
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "@devyou/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DevYou public site, search, diagnostic sessions and contributor UI",
+  "scripts": {
+    "build": "react-router build",
+    "dev": "vite dev",
+    "preview": "pnpm run build && vite preview",
+    "cf-typegen": "wrangler types",
+    "typecheck": "react-router typegen && tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:unit": "vitest run --passWithNoTests",
+    "build:staging": "cross-env CLOUDFLARE_ENV=staging react-router build",
+    "deploy:staging": "pnpm run build:staging && wrangler deploy --env staging",
+    "deploy:production": "cross-env CLOUDFLARE_ENV=production react-router build && wrangler deploy"
+  },
+  "dependencies": {
+    "@devyou/ai": "workspace:*",
+    "@devyou/auth": "workspace:*",
+    "@devyou/core": "workspace:*",
+    "@devyou/db": "workspace:*",
+    "@devyou/domain": "workspace:*",
+    "@devyou/observability": "workspace:*",
+    "@devyou/schemas": "workspace:*",
+    "@devyou/search": "workspace:*",
+    "@devyou/security": "workspace:*",
+    "@devyou/ui": "workspace:*",
+    "isbot": "^5.2.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router": "^8.3.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.52.1",
+    "@cloudflare/vitest-pool-workers": "^0.21.3",
+    "@devyou/config": "workspace:*",
+    "@react-router/dev": "^8.3.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "cross-env": "^10.1.0",
+    "drizzle-orm": "^0.45.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~5.9.3",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.123.0"
+  }
+}

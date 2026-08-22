@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.turbo
+.wrangler
+.react-router
+coverage
+pnpm-lock.yaml
+docs/design/stitch
+worker-configuration.d.ts

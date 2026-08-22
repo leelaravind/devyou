@@ -1,0 +1,97 @@
+/**
+ * DevYou — public Worker.
+ *
+ * Serves dev.itisyou.app: the public site, search, playbook pages, diagnostic
+ * sessions and the contributor UI. It is the only Worker the internet talks to.
+ *
+ * What it deliberately does NOT hold:
+ *
+ *   - The AI provider credential. Structuring runs in `devyou-jobs`, reached
+ *     through the queue. A public request path that could spend tokens is a
+ *     denial-of-wallet waiting to happen, and plan §11 forbids an AI call on an
+ *     ordinary playbook read anyway.
+ *   - Any admin capability. Moderation, taxonomy and disputes live behind
+ *     Cloudflare Access on `devyou-admin`, on a different hostname with a
+ *     different cookie namespace.
+ *   - A binding to any other product's resources. ADR-0001: isolation is
+ *     enforced by the absence of the binding, which is visible in review, not by
+ *     a policy somebody has to remember.
+ *
+ * Top level is production; staging is under `env.staging`. Wrangler names the
+ * production Worker without a suffix, so every non-production name carries its
+ * environment and a misconfigured binding fails loudly rather than reading the
+ * wrong environment's data.
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "devyou-app",
+  "main": "./workers/app.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": "./build/client", "binding": "ASSETS" },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "upload_source_maps": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "dev.itisyou.app", "custom_domain": true }],
+  /*
+    A ceiling, not headroom.
+
+    Workers Paid defaults to 30 seconds of CPU per invocation. Left at the default,
+    a runaway loop in a search ranker turns into a bill. 200ms is generous for an
+    SSR render plus two D1 queries and tight enough to catch a regression.
+
+    `limits` is rejected outright on the Free plan (`code: 100328`), so a deploy
+    that accepts this block is itself the plan check — see baseline unknown U-3.
+  */
+  "limits": { "cpu_ms": 200 },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "PUBLIC_APP_URL": "https://dev.itisyou.app",
+    "ADMIN_APP_URL": "https://dev-admin.itisyou.app",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "devyou-db-production",
+      "database_id": "283a19f0-0896-4506-8f19-dda3e7fd52d2",
+    },
+  ],
+  "kv_namespaces": [{ "binding": "CACHE", "id": "a50e21d05a15411181579c0e661c67f7" }],
+  "r2_buckets": [
+    { "binding": "EVIDENCE", "bucket_name": "devyou-evidence-production", "jurisdiction": "eu" },
+  ],
+  "queues": {
+    "producers": [{ "binding": "EVENTS", "queue": "devyou-events-production" }],
+  },
+  "env": {
+    "staging": {
+      "name": "devyou-app-staging",
+      "limits": { "cpu_ms": 200 },
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "PUBLIC_APP_URL": "https://dev-staging.itisyou.app",
+        "ADMIN_APP_URL": "https://dev-admin-staging.itisyou.app",
+      },
+      "assets": { "directory": "./build/client", "binding": "ASSETS" },
+      "observability": { "enabled": true, "head_sampling_rate": 1 },
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [{ "pattern": "dev-staging.itisyou.app", "custom_domain": true }],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "devyou-db-staging",
+          "database_id": "ee2ac390-d79b-42b9-bb2c-53fd47e84bc7",
+        },
+      ],
+      "kv_namespaces": [{ "binding": "CACHE", "id": "cc27b3bad3c34026b632d23ab9bcf4ff" }],
+      "r2_buckets": [
+        { "binding": "EVIDENCE", "bucket_name": "devyou-evidence-staging", "jurisdiction": "eu" },
+      ],
+      "queues": {
+        "producers": [{ "binding": "EVENTS", "queue": "devyou-events-staging" }],
+      },
+    },
+  },
+}
