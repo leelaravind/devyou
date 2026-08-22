@@ -180,6 +180,15 @@ export default function Contribute({ loaderData }: Route.ComponentProps) {
             </li>
           ))}
         </ul>
+        <p className="mt-3 text-body-sm text-on-surface-variant">
+          You do not have to arrive with one of those already written.{" "}
+          <Link to="/contribute/start" className="text-evidence-blue underline">
+            Paste the rough notes
+          </Link>{" "}
+          — the problem and whatever fixed it — and the structure is proposed from them for you to
+          correct. It needs an account, unlike everything above it, because a draft is private and
+          resumable and has to belong to somebody.
+        </p>
       </section>
 
       <section aria-labelledby="rules">

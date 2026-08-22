@@ -1,0 +1,6 @@
+/* The whole design system, unforked. Tokens, base layer and component primitives live
+   in @devyou/ui so the public site and the admin console cannot drift apart — an admin
+   surface with its own quietly diverging palette is how "destructive red" ends up
+   meaning two different things in two places. */
+@import "@devyou/ui/styles/theme.css";
+@source "../../../packages/ui/src";

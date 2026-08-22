@@ -85,6 +85,11 @@ export const draftFieldProvenance = sqliteTable(
      *  It is the record of what the AI got wrong, which is the only way to tell
      *  whether the structuring is improving. */
     originalValue: text("original_value"),
+    /** The model's one-sentence reason for the value, shown beside the field on the
+     *  review screen. Without it the confirmation checkbox asks the author to
+     *  approve an inference they have no way to evaluate, which is a checkbox
+     *  people tick. Null when the field is the author's own. */
+    basis: text("basis"),
   },
   (table) => [
     uniqueIndex("draft_field_provenance_unique").on(table.draftId, table.fieldPath),

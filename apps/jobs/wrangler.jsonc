@@ -1,0 +1,107 @@
+/**
+ * DevYou — jobs Worker.
+ *
+ * The queue consumer. It exists so that no request path can spend money on a model
+ * call: `devyou-app` holds no AI credential and produces a message, this Worker
+ * holds the credential and consumes one. Plan §11's cost controls start with that
+ * split rather than with a rate limit, because a rate limit is a number somebody
+ * can get wrong and a missing binding is not.
+ *
+ * What it deliberately does NOT have:
+ *
+ *   - A route or a hostname. There is no `fetch` handler and no `workers.dev`
+ *     origin. The only way to reach this Worker is to put a message on the queue,
+ *     and the only producer is `devyou-app`.
+ *   - Any admin capability. It can write a draft's structuring and its own ledger
+ *     row. It cannot publish, verify, delete or suspend anything — the model behind
+ *     it certainly cannot, and the shortest way to keep that true is to give the
+ *     Worker no code that could.
+ *   - A binding to another product's resources. ADR-0001.
+ *
+ * Top level is production; staging is under `env.staging`.
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "devyou-jobs",
+  "main": "./src/index.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "upload_source_maps": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  /*
+    Higher than the public Worker's 200ms, because a structuring job is a provider
+    round trip and a batch of database writes rather than an SSR render. Still a
+    ceiling: a consumer with the default 30 seconds and a loop in it is a bill.
+  */
+  "limits": { "cpu_ms": 5000 },
+  "vars": {
+    "ENVIRONMENT": "production",
+    /*
+      The daily spend ceiling, in micro-USD. Checked by summing `ai_tasks` before
+      any provider call, so an exhausted budget is a refusal that reaches the
+      contributor as a sentence on the review screen rather than as an invoice.
+    */
+    "AI_DAILY_BUDGET_MICRO_USD": "2000000",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "devyou-db-production",
+      "database_id": "283a19f0-0896-4506-8f19-dda3e7fd52d2",
+    },
+  ],
+  "queues": {
+    "consumers": [
+      {
+        "queue": "devyou-events-production",
+        /*
+          One message at a time. A batch amortises nothing here — each message is
+          its own provider call — and a batch that fails halfway retries messages
+          that already succeeded, which on a paid API means paying twice.
+        */
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        /*
+          Two retries, then the dead letter queue. A structuring failure is usually
+          the model or the prompt rather than a transient fault, and retrying a
+          prompt problem is how one bad submission becomes a hundred calls.
+        */
+        "max_retries": 2,
+        "dead_letter_queue": "devyou-events-dlq-production",
+      },
+    ],
+  },
+  "env": {
+    "staging": {
+      "name": "devyou-jobs-staging",
+      "limits": { "cpu_ms": 5000 },
+      "observability": { "enabled": true, "head_sampling_rate": 1 },
+      "workers_dev": false,
+      "preview_urls": false,
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "AI_DAILY_BUDGET_MICRO_USD": "500000",
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "devyou-db-staging",
+          "database_id": "ee2ac390-d79b-42b9-bb2c-53fd47e84bc7",
+        },
+      ],
+      "queues": {
+        "consumers": [
+          {
+            "queue": "devyou-events-staging",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 2,
+            "dead_letter_queue": "devyou-events-dlq-staging",
+          },
+        ],
+      },
+    },
+  },
+}

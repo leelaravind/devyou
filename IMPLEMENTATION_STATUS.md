@@ -32,7 +32,7 @@ A successful build is not `TESTED`. A successful `wrangler deploy` is not
 | 4 | Playbook reader + diagnostic engine | **VERIFIED STAGING** |
 | 5 | Environment + evidence UX | **VERIFIED STAGING** |
 | 6 | Authentication + contributor identity | **VERIFIED STAGING** (unconfigured path; OAuth round-trip blocked on A0-4) |
-| 7 | Contribution pipeline + AI structuring | `IN PROGRESS` — proposals ship; drafting pipeline does not |
+| 7 | Contribution pipeline + AI structuring | `TESTED` — full pipeline + jobs Worker; never deployed, never run against a real model |
 | 8 | Reproduction + micro-contribution | **VERIFIED STAGING** |
 | 9 | Revisioning, deprecation, staleness | `IMPLEMENTED` — untested for multi-revision, corpus has none |
 | 10 | Dev Admin module | `NOT STARTED` |
@@ -325,6 +325,51 @@ policy exists for. Verified both directions on staging:
 capabilities** — asserted exhaustively rather than spot-checked, so a capability added
 later cannot be granted to every account that signs in without the test failing.
 Account age, followers, stars and organisation membership are not read and not stored.
+
+---
+
+## Phase 7 — Contribution pipeline + AI structuring
+
+**State: TESTED — not deployed, and the AI half has never met a real model.**
+
+The whole pipeline exists: `/contribute/start` (raw capture), `/contribute/:draftId/review`
+(structure review), `/contribute/:draftId/edit` (graph editor), `/contribute/:draftId/publish`
+(the gate), plus `devyou-jobs`, the queue consumer that holds the AI credential.
+
+### The authority boundary, and where it is enforced
+
+| Claim | Enforced by |
+|---|---|
+| A model's inference cannot become public without a person | `draft_field_provenance` rows with `confirmed_at IS NULL` block `canPublish`; the gate is re-run inside `publishDraft` against the write itself, not only for the screen |
+| Nothing AI writes leaves a draft | The jobs Worker's only writes are `contribution_drafts`, `draft_field_provenance` and its own `ai_tasks` row; `@devyou/ai` imports no database client |
+| The pipeline works with no AI at all | An absent credential, a spent budget, a refusal and an unbound queue all land on the same review screen, which names the reason and offers "write the structure myself" |
+| A retried job cannot overwrite an author | `structureContribution` returns immediately unless the draft is still `structuring` |
+| An author's own safety classification is a floor, not a ceiling | `effectiveSafety` takes the more severe of the author's answer and `classifyCommand`, and it is what gets written to `diagnostic_nodes` |
+
+### Publication
+
+One `db.batch`: the revision is inserted as a draft, its graph goes in while it is still one,
+and only then is `published_at` set — after which the triggers freeze it. A new revision always
+gets `INITIAL_BAND` with explicit zeroes and exactly one `contributor_documentation` record, and
+the superseded revision keeps its own evidence at its own URL. Asserted in
+`apps/app/test/contribution.test.ts`, including the two-revision case.
+
+### What is not done
+
+- **Never deployed.** `devyou-jobs` has no deploy on either environment and
+  `ANTHROPIC_API_KEY` is set nowhere, so `structure_contribution` has not run once against
+  the real provider. The Phase 7 gate in plan §24 — malicious prompt text stays data,
+  malformed output fails safely — is what `scripts/verify-ai.mjs` exists to prove, and it
+  has not been run.
+- **No result cache.** Plan §11 asks for caching by normalised input hash. `ai_tasks` has
+  the hash column but nowhere to keep a result, and the only copy of a previous structuring
+  is inside another contributor's private draft. Recorded rather than invented.
+- **`duplicate_candidates` is not wired in.** The task exists in `@devyou/ai`; nothing calls
+  it, so a contributor gets no duplicate warning before publishing.
+- **Node-level provenance is `ai_extracted`, never an inference.** `structuredNode` carries
+  no per-field provenance, so the model has not said which parts of a step it read and which
+  it filled in. The review screen says so and asks the author to delete any step they did not
+  run; a stronger claim would be one the schema cannot support.
 
 ---
 

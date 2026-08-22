@@ -42,6 +42,85 @@ importers:
         specifier: ^8.67.0
         version: 8.67.0(eslint@10.8.1(jiti@2.7.0)(supports-color@10.2.2))(supports-color@10.2.2)(typescript@5.9.3)
 
+  apps/admin:
+    dependencies:
+      '@devyou/admin-contract':
+        specifier: workspace:*
+        version: link:../../packages/admin-contract
+      '@devyou/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@devyou/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@devyou/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@devyou/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@devyou/security':
+        specifier: workspace:*
+        version: link:../../packages/security
+      '@devyou/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      isbot:
+        specifier: ^5.2.1
+        version: 5.2.1
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.8
+        version: 19.2.8(react@19.2.8)
+      react-router:
+        specifier: ^8.3.0
+        version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@cloudflare/vite-plugin':
+        specifier: ^1.52.1
+        version: 1.53.1(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))(wrangler@4.125.0(@cloudflare/workers-types@5.20260820.1))
+      '@cloudflare/vitest-pool-workers':
+        specifier: ^0.21.3
+        version: 0.21.3(@cloudflare/workers-types@5.20260820.1)(@vitest/runner@4.1.11)(@vitest/snapshot@4.1.11)(vitest@4.1.11(@types/node@22.20.1)(jsdom@28.1.0(supports-color@10.2.2))(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)))
+      '@devyou/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@react-router/dev':
+        specifier: ^8.3.0
+        version: 8.3.0(react-router@8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(supports-color@10.2.2)(typescript@5.9.3)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))(wrangler@4.125.0(@cloudflare/workers-types@5.20260820.1))
+      '@tailwindcss/vite':
+        specifier: ^4.3.3
+        version: 4.3.3(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
+      '@types/react':
+        specifier: ^19.2.18
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19.2.4
+        version: 19.2.4(@types/react@19.2.18)
+      cross-env:
+        specifier: ^10.1.0
+        version: 10.1.0
+      tailwindcss:
+        specifier: ^4.3.3
+        version: 4.3.3
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vite:
+        specifier: ^8.2.1
+        version: 8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.11(@types/node@22.20.1)(jsdom@28.1.0(supports-color@10.2.2))(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
+      wrangler:
+        specifier: ^4.123.0
+        version: 4.125.0(@cloudflare/workers-types@5.20260820.1)
+
   apps/app:
     dependencies:
       '@devyou/ai':
@@ -133,11 +212,42 @@ importers:
         specifier: ^4.123.0
         version: 4.125.0(@cloudflare/workers-types@5.20260820.1)
 
+  apps/jobs:
+    dependencies:
+      '@devyou/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
+      '@devyou/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@devyou/schemas':
+        specifier: workspace:*
+        version: link:../../packages/schemas
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@devyou/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.10
+        version: 4.1.11(@types/node@22.20.1)(jsdom@28.1.0(supports-color@10.2.2))(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12))
+      wrangler:
+        specifier: ^4.123.0
+        version: 4.125.0(@cloudflare/workers-types@5.20260820.1)
+
   packages/admin-contract:
     dependencies:
       '@devyou/core':
         specifier: workspace:*
         version: link:../core
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^5.20260818.1
@@ -287,6 +397,9 @@ importers:
       '@devyou/core':
         specifier: workspace:*
         version: link:../core
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^5.20260818.1

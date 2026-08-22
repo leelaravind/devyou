@@ -1,0 +1,100 @@
+/**
+ * DevYou — admin Worker.
+ *
+ * Serves dev-admin.itisyou.app: moderation, evidence inspection, taxonomy,
+ * contributor management, flags and the audit log. ADR-0001: there is no shared
+ * ITISYOU Admin Console to extend, so DevYou ships its own on its own hostname with
+ * its own Cloudflare Access application and its own audit log.
+ *
+ * Three settings here are load-bearing security controls rather than preferences.
+ *
+ * `workers_dev: false` and `preview_urls: false` — a `workers.dev` origin serves the
+ * same Worker on a hostname that is *not* covered by the Access application, which
+ * routes around the outer gate entirely and makes the whole perimeter decorative.
+ * ATSYou's admin carries the same two lines with the same reasoning; matching it is
+ * deliberate.
+ *
+ * `assets.run_worker_first: true` — by default a request matching a file in the assets
+ * directory is served by Cloudflare's asset router *before the Worker runs*. On a
+ * public site that is exactly right. Here it would mean the admin bundle is served by
+ * code that never checked the Access JWT. Access itself still gates the hostname, but
+ * an admin perimeter whose second layer applies to HTML and not to the JavaScript that
+ * HTML loads is not a second layer. With this set, every byte leaves through
+ * `workers/app.ts`.
+ *
+ * What is deliberately absent: any binding to a resource not named `devyou-*`, and any
+ * queue producer. Isolation is enforced by the absence of the binding, which is visible
+ * in review (ADR-0001 decision 1), and a binding added "for later" is a binding nobody
+ * re-reviews when later arrives.
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "devyou-admin",
+  "main": "./workers/app.ts",
+  "compatibility_date": "2026-08-22",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": "./build/client", "binding": "ASSETS", "run_worker_first": true },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "upload_source_maps": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "dev-admin.itisyou.app", "custom_domain": true }],
+  /*
+    Higher than the public Worker's 200ms, and for one specific reason: the overview
+    and search-quality surfaces run grouped aggregates over `search_events` and
+    `ai_tasks`, which the public Worker never touches. 300ms is still a ceiling rather
+    than headroom — a runaway aggregate should fail an admin page, not produce a bill.
+  */
+  "limits": { "cpu_ms": 300 },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "ADMIN_APP_URL": "https://dev-admin.itisyou.app",
+    "PUBLIC_APP_URL": "https://dev.itisyou.app",
+    /*
+      The Access team domain is a `var`, not a secret. It appears in every Access
+      redirect the browser follows, so treating it as sensitive would be theatre that
+      makes the real secret — CF_ACCESS_POLICY_AUD, which names one application —
+      look like just another config value.
+    */
+    "CF_ACCESS_TEAM_DOMAIN": "https://itisyou-network.cloudflareaccess.com",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "devyou-db-production",
+      "database_id": "283a19f0-0896-4506-8f19-dda3e7fd52d2",
+    },
+  ],
+  "kv_namespaces": [{ "binding": "CACHE", "id": "a50e21d05a15411181579c0e661c67f7" }],
+  "r2_buckets": [
+    { "binding": "EVIDENCE", "bucket_name": "devyou-evidence-production", "jurisdiction": "eu" },
+  ],
+  "env": {
+    "staging": {
+      "name": "devyou-admin-staging",
+      "limits": { "cpu_ms": 300 },
+      "vars": {
+        "ENVIRONMENT": "staging",
+        "ADMIN_APP_URL": "https://dev-admin-staging.itisyou.app",
+        "PUBLIC_APP_URL": "https://dev-staging.itisyou.app",
+        "CF_ACCESS_TEAM_DOMAIN": "https://itisyou-network.cloudflareaccess.com",
+      },
+      "assets": { "directory": "./build/client", "binding": "ASSETS", "run_worker_first": true },
+      "observability": { "enabled": true, "head_sampling_rate": 1 },
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [{ "pattern": "dev-admin-staging.itisyou.app", "custom_domain": true }],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "devyou-db-staging",
+          "database_id": "ee2ac390-d79b-42b9-bb2c-53fd47e84bc7",
+        },
+      ],
+      "kv_namespaces": [{ "binding": "CACHE", "id": "cc27b3bad3c34026b632d23ab9bcf4ff" }],
+      "r2_buckets": [
+        { "binding": "EVIDENCE", "bucket_name": "devyou-evidence-staging", "jurisdiction": "eu" },
+      ],
+    },
+  },
+}

@@ -14,7 +14,8 @@
     "test:unit": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@devyou/core": "workspace:*"
+    "@devyou/core": "workspace:*",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@devyou/config": "workspace:*",

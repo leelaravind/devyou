@@ -1,0 +1,7 @@
+{
+  "extends": "../../packages/config/tsconfig/worker.json",
+  "include": ["src/**/*", "worker-configuration.d.ts", "worker-secrets.d.ts"],
+  "compilerOptions": {
+    "types": ["./worker-configuration.d.ts"]
+  }
+}

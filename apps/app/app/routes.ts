@@ -63,6 +63,29 @@ export default [
   route("how-verification-works", "routes/how-verification-works.tsx"),
   route("contribute", "routes/contribute.tsx"),
 
+  /*
+    The contribution pipeline. Plan §10, in the order it happens.
+
+    `/contribute` is signposting and stays public; everything below it is a draft,
+    which is private to its author and returns 404 to anybody else — a 403 would
+    confirm that an unpublished draft exists, and an author's half-written
+    correction to a security playbook is exactly what somebody would probe for.
+
+    The three draft routes are separate URLs rather than steps in one wizard because
+    a draft is resumable: plan §10 requires save-and-resume, and a contributor who
+    comes back a week later needs to arrive at the screen they left, not at the
+    start of a flow.
+
+    `/contribute/start` is not in plan §7's list. It is raw capture — plan §10 step
+    A — which the plan attaches to `/contribute` itself; that page is a signposting
+    surface ordered by cost, and putting a large form at the top of it would undo
+    the thing it was built to do.
+  */
+  route("contribute/start", "routes/contribute.start.tsx"),
+  route("contribute/:draftId/review", "routes/contribute.$draftId.review.tsx"),
+  route("contribute/:draftId/edit", "routes/contribute.$draftId.edit.tsx"),
+  route("contribute/:draftId/publish", "routes/contribute.$draftId.publish.tsx"),
+
   route("robots.txt", "routes/robots.ts"),
   route("llms.txt", "routes/llms.ts"),
   route("sitemap.xml", "routes/sitemap.ts"),

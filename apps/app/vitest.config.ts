@@ -41,6 +41,15 @@ export default defineConfig({
               compatibilityFlags: ["nodejs_compat", "global_fetch_strictly_public"],
               d1Databases: ["DB"],
               kvNamespaces: ["CACHE"],
+              /*
+                The producer side only. There is no consumer here on purpose: the
+                jobs Worker is a separate deploy, and what this Worker must be
+                tested for is that a structuring job is *dispatched and ledgered*,
+                not what the model eventually says. Without the binding, every
+                dispatch would take the failure path and the test would assert the
+                wrong thing.
+              */
+              queueProducers: ["EVENTS"],
               bindings: {
                 TEST_MIGRATIONS: migrations,
                 ENVIRONMENT: "staging",

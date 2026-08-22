@@ -1,0 +1,27 @@
+{
+  "name": "@devyou/jobs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DevYou queue consumer: AI structuring and other work that must not sit on a request path",
+  "scripts": {
+    "cf-typegen": "wrangler types",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:unit": "vitest run --passWithNoTests",
+    "deploy:staging": "wrangler deploy --env staging",
+    "deploy:production": "wrangler deploy"
+  },
+  "dependencies": {
+    "@devyou/ai": "workspace:*",
+    "@devyou/core": "workspace:*",
+    "@devyou/schemas": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@devyou/config": "workspace:*",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.10",
+    "wrangler": "^4.123.0"
+  }
+}

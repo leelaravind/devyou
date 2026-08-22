@@ -1,0 +1,10 @@
+{
+  "extends": "../../packages/config/tsconfig/react.json",
+  "include": ["**/*.ts", "**/*.tsx", ".react-router/types/**/*", "worker-configuration.d.ts"],
+  "compilerOptions": {
+    "rootDirs": [".", "./.react-router/types"],
+    "types": ["vite/client", "./worker-configuration.d.ts", "@cloudflare/vitest-pool-workers/types"],
+    "baseUrl": ".",
+    "paths": { "~/*": ["./app/*"] }
+  }
+}

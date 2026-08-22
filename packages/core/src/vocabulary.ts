@@ -259,6 +259,25 @@ export function requiresHumanConfirmation(provenance: Provenance): boolean {
 }
 
 /* ---------------------------------------------------------------------------
+   Contribution
+   --------------------------------------------------------------------------- */
+
+/**
+ * The longest raw submission a draft accepts.
+ *
+ * Matches `structureContributionTask.maxInputChars` in `@devyou/ai`, and lives here
+ * rather than beside either the AI task or the database code because the capture
+ * form has to state it before anybody types — a limit a contributor only discovers
+ * on submit is a limit that costs them a paste. This file is the one place a limit
+ * can be stated without dragging a validation library into a page that only needs
+ * the number.
+ *
+ * Exceeding it is a refusal, never a silent truncation. A stack trace cut in half
+ * produces a confidently wrong structuring instead of an obvious failure.
+ */
+export const MAX_RAW_TEXT = 24_000;
+
+/* ---------------------------------------------------------------------------
    Source references
    --------------------------------------------------------------------------- */
 
