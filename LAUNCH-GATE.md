@@ -47,7 +47,7 @@ else on this page matters.
 | 7 | Malicious prompt text stays data; malformed model output fails safely | ⚠️ **structurally enforced and unit-tested; no real model call has been made** |
 | 8 | A reproduction can be filed in 10–30 seconds | ✅ |
 | 9 | Historical revisions survive and keep their own evidence | ✅ 11 tests against production |
-| 10 | Admin refuses everything until Access is configured | ✅ 503 with a message naming A0-1 |
+| 10 | Admin refuses everything until Access is configured | ✅ Access enforcing on every path; Worker still fails closed on a variable-name mismatch (§5) |
 | 11 | Hostile content is neutralised | ✅ 81/82, 1 pinned known-failure with reasoning |
 | 12 | Accessible, crawlable, fast | ✅ axe clean, 98/98 E2E, TTFB 39–133 ms |
 | 13 | Closed validation with real users | ❌ **not run** — see §4 |
@@ -61,7 +61,7 @@ else on this page matters.
 |---|---|---|
 | `devyou-app` | `dev.itisyou.app` | ✅ serving |
 | `devyou-jobs` | none (queue consumer only) | ✅ consuming `devyou-events-production` |
-| `devyou-admin` | `dev-admin.itisyou.app` | ⚠️ deployed and **refusing every request** until A0-1 |
+| `devyou-admin` | `dev-admin.itisyou.app` | ⚠️ behind Cloudflare Access, and still refusing every request — the deployed build reads `CF_ACCESS_POLICY_AUD`, the secret is named `CF_ACCESS_AUD`. Fixed in source, not yet redeployed |
 
 Production corpus: 43 playbooks, 44 published revisions (one superseded), 352 nodes,
 473 edges, 33 technologies, 171 aliases, 110 evidence records, **0 reproductions**.
@@ -79,7 +79,8 @@ not a lie.
 cannot be simulated. Everything below the surface has been tested; whether a developer
 at 3am finds this faster than a search engine is not something a test suite can answer.
 
-**No real model call has been made.** `ANTHROPIC_API_KEY` is set nowhere, so the
+**No real model call has been made.** `ANTHROPIC_API_KEY` is not set on the Worker that
+reads it (see §5), so the
 structuring pipeline has never run end to end against the live API. The advisory
 boundary is enforced structurally and unit-tested, and `scripts/verify-ai.mjs` exists
 to prove the injection resistance — it has not been run against production.
@@ -105,10 +106,43 @@ untouched because two concurrent sessions were writing.
 
 | # | Action | Blocks |
 |---|---|---|
-| A0-1 | Cloudflare Access application for `dev-admin.itisyou.app` and `dev-admin-staging.itisyou.app`, and set `CF_ACCESS_POLICY_AUD` | The admin surface, entirely |
+| A0-1 | **Done** for `dev-admin.itisyou.app` — Access application created and enforcing on every path. See the note below | — |
 | A0-3 | Decide the public content licence and contribution terms (ADR-0013) | Opening unrestricted public contribution |
 | A0-4 | Register a GitHub OAuth app; set `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` as Worker Secrets | Sign-in, and therefore counted reproductions |
-| — | Set `ANTHROPIC_API_KEY` as a Worker Secret on `devyou-jobs` | AI structuring in the contribution pipeline |
+| — | Move `ANTHROPIC_API_KEY` from `devyou-app` to `devyou-jobs` | AI structuring in the contribution pipeline |
+
+### A0-1, verified 22 August 2026
+
+The Access application exists and is enforcing. Checked from outside the perimeter rather
+than taken on trust: an unauthenticated request to `/`, to `/moderation`, to `/assets/*`
+and to `/healthz` each returns `302` to the team domain's login endpoint. There is no path
+on that hostname that reaches the origin unauthenticated.
+
+Two things about it are not yet finished, and neither is cosmetic.
+
+**The secret was stored as `CF_ACCESS_AUD`; the Worker read `CF_ACCESS_POLICY_AUD`.** A
+name that does not match is the same as a name that is absent, so the Worker stayed in its
+fail-closed branch and the admin surface still served nothing — behind a correctly
+configured gate. The repository has been renamed to `CF_ACCESS_AUD` to match what is
+actually deployed, because the alternative asks the owner to re-enter a credential to
+satisfy a spelling. **The admin Worker has not been redeployed with the rename**, so this
+is fixed in source and not yet in production.
+
+**`dev-admin-staging.itisyou.app` has no Access application, and no staging admin Worker to
+protect.** `devyou-admin-staging` has never been deployed. That is a coherent state — an
+absent Worker cannot be reached — but it is not the state this table previously implied.
+
+### The Anthropic key is on the wrong Worker
+
+`ANTHROPIC_API_KEY` is set on **`devyou-app`**, the public request-path Worker, which has
+no code that reads it. `devyou-jobs`, which does read it, has no secrets at all.
+
+The split those two Workers exist to enforce is stated in `apps/jobs/wrangler.jsonc`: no
+request path may spend money on a model call, so the public Worker produces a queue message
+and the jobs Worker — which has no hostname and no `fetch` handler — holds the credential
+and consumes it. A key on `devyou-app` is a paid, prompt-injectable credential sitting in
+the environment of the one Worker the open internet can reach. Nothing reads it today; the
+control was that nothing *could*.
 
 A0-2 (DNS and custom domains) is **closed** — the production deploy created
 `dev.itisyou.app` and `dev-admin.itisyou.app` as custom domains, and both resolve.

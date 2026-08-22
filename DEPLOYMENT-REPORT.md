@@ -25,8 +25,8 @@ at any point.**
 | Kind | Production | Staging |
 |---|---|---|
 | Worker | `devyou-app` | `devyou-app-staging` |
-| Worker | `devyou-jobs` (queue consumer, no fetch handler) | `devyou-jobs-staging` |
-| Worker | `devyou-admin` | `devyou-admin-staging` |
+| Worker | `devyou-jobs` (queue consumer, no fetch handler) | **not deployed** |
+| Worker | `devyou-admin` | **not deployed** |
 | D1 | `devyou-db-production` | `devyou-db-staging` |
 | KV | `devyou-cache-production` | `devyou-cache-staging` |
 | R2 | `devyou-evidence-production` (EU jurisdiction) | `devyou-evidence-staging` (EU) |
@@ -34,6 +34,14 @@ at any point.**
 
 Custom domains `dev.itisyou.app` and `dev-admin.itisyou.app` were created by the
 production deploy, which closed owner action A0-2.
+
+The two "not deployed" cells are a correction to the first version of this report, which
+listed all six Workers as though they existed. `wrangler secret list --env staging`
+returns "Worker not found" for both, and the account's Worker list contains exactly four
+`devyou-*` entries. Only `devyou-app` has a staging twin; the jobs and admin Workers have
+been deployed to production only. Deploying either staging Worker would create a new
+custom domain, which is a DNS change and therefore an owner decision rather than a
+build step.
 
 ---
 

@@ -71,7 +71,7 @@ Step-up (per action)    ← re-verified second factor within 600s, for privilege
 
 Two details worth carrying into Dev verbatim:
 
-- **Access fails closed.** If `CF_ACCESS_TEAM_DOMAIN` or `CF_ACCESS_POLICY_AUD` is missing
+- **Access fails closed.** If `CF_ACCESS_TEAM_DOMAIN` or `CF_ACCESS_AUD` is missing
   on a deployed environment, the admin surface returns `INTERNAL` and refuses to serve,
   rather than silently dropping its outer wall.
 - **`workers_dev: false` and `preview_urls: false`** on the admin Worker. A `workers.dev`
@@ -80,7 +80,7 @@ Two details worth carrying into Dev verbatim:
 
 **Cloudflare Access team domain:** `https://itisyou-network.cloudflareaccess.com`
 (a `var`, not a secret — it appears in every Access redirect anyway). The paired
-`CF_ACCESS_POLICY_AUD` is a Worker secret and identifies one Access application. **Dev
+`CF_ACCESS_AUD` is a Worker secret and identifies one Access application. **Dev
 needs its own Access application and therefore its own AUD.** This is an owner action —
 see §6.
 

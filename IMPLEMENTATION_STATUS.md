@@ -361,11 +361,19 @@ the superseded revision keeps its own evidence at its own URL. Asserted in
 
 ### What is not done
 
-- **Never deployed.** `devyou-jobs` has no deploy on either environment and
-  `ANTHROPIC_API_KEY` is set nowhere, so `structure_contribution` has not run once against
-  the real provider. The Phase 7 gate in plan §24 — malicious prompt text stays data,
-  malformed output fails safely — is what `scripts/verify-ai.mjs` exists to prove, and it
-  has not been run.
+- **The credential is on the wrong Worker.** `devyou-jobs` is deployed to production (not
+  to staging, which has no jobs Worker at all), but `ANTHROPIC_API_KEY` is set on
+  `devyou-app` — the public Worker, which has no code that reads it — and `devyou-jobs`
+  has no secrets. So `structure_contribution` still refuses with "no AI credential is
+  configured on this deployment", and has not run once against the real provider. The
+  Phase 7 gate in plan §24 — malicious prompt text stays data, malformed output fails
+  safely — is what `scripts/verify-ai.mjs` exists to prove, and it has not been run.
+
+  The misplacement matters beyond the outage. `apps/jobs/wrangler.jsonc` exists to make a
+  paid model call unreachable from any request path; a key in the public Worker's
+  environment is that guarantee held up by nothing but the absence of one line of code.
+  `apps/app/worker-secrets.d.ts` no longer declares the variable, so that line now fails
+  to compile — but the secret should still be moved.
 - **No result cache.** Plan §11 asks for caching by normalised input hash. `ai_tasks` has
   the hash column but nowhere to keep a result, and the only copy of a previous structuring
   is inside another contributor's private draft. Recorded rather than invented.

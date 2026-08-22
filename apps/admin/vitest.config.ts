@@ -18,7 +18,7 @@ import path from "node:path";
  * none of them exercises the route that changed. Reading the sources is the only way to
  * assert something about every route, including the ones nobody remembered.
  *
- * `CF_ACCESS_POLICY_AUD` is deliberately absent from the bindings below. The default state
+ * `CF_ACCESS_AUD` is deliberately absent from the bindings below. The default state
  * under test is "Access is not configured", which is the state the Worker will genuinely
  * first be deployed in — see owner action A0-1. A test that wants a configured perimeter
  * supplies the AUD itself, which keeps the fail-closed path as the one that is exercised

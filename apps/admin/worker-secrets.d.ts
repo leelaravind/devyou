@@ -7,12 +7,12 @@
  *
  * Optional in the type, mandatory at runtime — and that asymmetry is the point. The
  * Access application does not exist yet (owner action A0-1), so a deployment without
- * `CF_ACCESS_POLICY_AUD` is a real state the Worker must handle. Typing it as required
+ * `CF_ACCESS_AUD` is a real state the Worker must handle. Typing it as required
  * would make the compiler assert a fact about production that is currently false, and
  * would hide the branch that matters: with no AUD configured the Worker refuses every
  * request. See `app/lib/access.server.ts`.
  *
- * Set it with `wrangler secret put CF_ACCESS_POLICY_AUD --env staging`, never in
+ * Set it with `wrangler secret put CF_ACCESS_AUD --env staging`, never in
  * `.env`, `.dev.vars` committed to git, or this repository.
  */
 interface Env {
@@ -24,5 +24,5 @@ interface Env {
    * an operator with access to an unrelated internal tool would be admitted here. That
    * is why an unconfigured AUD is a refusal rather than a relaxed check.
    */
-  CF_ACCESS_POLICY_AUD?: string;
+  CF_ACCESS_AUD?: string;
 }

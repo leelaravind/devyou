@@ -58,7 +58,7 @@ async function seedKeySet(): Promise<void> {
 }
 
 function configuredEnv(overrides: Partial<Env> = {}): Env {
-  return { ...env, CF_ACCESS_POLICY_AUD: AUD, ...overrides } as Env;
+  return { ...env, CF_ACCESS_AUD: AUD, ...overrides } as Env;
 }
 
 function base64Url(bytes: Uint8Array): string {
@@ -116,8 +116,12 @@ async function refusalCode(promise: Promise<unknown>): Promise<string> {
 
 describe("with no Access application configured", () => {
   /*
-    The state the Worker will genuinely first be deployed in — owner action A0-1 has not
-    been done. These two tests are the whole reason this module exists in its current shape.
+    Still a live state, and still the reason this module has its current shape.
+
+    A0-1 closed for `dev-admin.itisyou.app` on 22 August 2026, so production now has both a
+    team domain and a `CF_ACCESS_AUD`. `dev-admin-staging.itisyou.app` has neither, and any
+    future environment starts here too — the unconfigured path is not historical, it is
+    what every new deployment gets before somebody runs `wrangler secret put`.
   */
   it("refuses a request that carries no assertion", async () => {
     expect(await refusalCode(verifyAccessJwt(requestWith(null), env))).toBe("UNAVAILABLE");
@@ -135,11 +139,28 @@ describe("with no Access application configured", () => {
     expect(await refusalCode(verifyAccessJwt(requestWith(token), env))).toBe("UNAVAILABLE");
   });
 
-  it("names the blocking owner action rather than the missing variable", async () => {
+  it("tells the operator what to do rather than which variable is empty", async () => {
+    /*
+      `expect.assertions` rather than a bare try/catch.
+
+      The previous version of this test asserted inside a `catch` and nowhere else, which
+      meant it passed for two different reasons: the message was right, or the call never
+      threw at all. Deleting the fail-closed branch — the single most dangerous edit
+      possible in this file — would have left it green. This makes the test fail if
+      `verifyAccessJwt` ever resolves here, which is the property actually being defended.
+    */
+    expect.assertions(3);
     try {
       await verifyAccessJwt(requestWith(null), env);
     } catch (error) {
-      expect(ApiError.is(error) && error.publicMessage).toContain("A0-1");
+      const message = ApiError.is(error) ? error.publicMessage : "";
+      /* The action to take, and the name of the thing to set. Not "CF_ACCESS_AUD is
+         undefined", which sends an operator looking for a bug instead of for the Zero
+         Trust dashboard. */
+      expect(message).toContain("Access application");
+      expect(message).toContain("CF_ACCESS_AUD");
+      /* And it must not imply the surface is merely broken. */
+      expect(message).toContain("will not serve any request");
     }
   });
 });
@@ -179,6 +200,37 @@ describe("with the Access application configured", () => {
     expect(
       await refusalCode(verifyAccessJwt(requestWith(await signToken(claims)), configuredEnv())),
     ).toBe("UNAUTHENTICATED");
+  });
+
+  /*
+    `nbf` and `iat` were enforced in `claimsToIdentity` and asserted nowhere, so the
+    30-second skew allowance could have been widened, inverted or deleted without a test
+    noticing. Both are cheap to check and both are real: a future-dated token is what a
+    replay against a clock-skewed edge looks like.
+  */
+  it("refuses an assertion that is not yet valid", async () => {
+    await seedKeySet();
+    const token = await signToken({ ...defaultClaims(), nbf: now() + 600 });
+    expect(await refusalCode(verifyAccessJwt(requestWith(token), configuredEnv()))).toBe(
+      "UNAUTHENTICATED",
+    );
+  });
+
+  it("refuses an assertion issued in the future", async () => {
+    await seedKeySet();
+    const token = await signToken({ ...defaultClaims(), iat: now() + 600 });
+    expect(await refusalCode(verifyAccessJwt(requestWith(token), configuredEnv()))).toBe(
+      "UNAUTHENTICATED",
+    );
+  });
+
+  /* And the other side of the same allowance: a token a few seconds off must still work,
+     or the gate would reject legitimate operators on a rounding boundary. */
+  it("accepts an assertion inside the clock-skew allowance", async () => {
+    await seedKeySet();
+    const token = await signToken({ ...defaultClaims(), iat: now() + 5, nbf: now() + 5 });
+    const identity = await verifyAccessJwt(requestWith(token), configuredEnv());
+    expect(identity.subject).toBe("operator@example.com");
   });
 
   it("refuses an expired assertion", async () => {

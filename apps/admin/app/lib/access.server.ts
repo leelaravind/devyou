@@ -14,12 +14,15 @@ import { ApiError } from "@devyou/core";
  *
  * **This module fails closed, unconditionally.**
  *
- * The Access application for the DevYou admin hostnames does not exist yet — it is
- * owner action A0-1, recorded in the Phase 0 audit and in ADR-0001, and it is outside
- * wrangler's reach. So the interesting state is not "misconfigured", it is "not yet
- * configured", and it is the state this Worker will genuinely first be deployed in.
+ * The Access application for `dev-admin.itisyou.app` now exists — owner action A0-1,
+ * closed on 22 August 2026. Verified from outside rather than assumed: an unauthenticated
+ * request to `/`, to a deep route, to `/assets/*` and to `/healthz` each returns a 302 to
+ * the team domain's login endpoint, so no path on this hostname reaches the origin
+ * unauthenticated. `dev-admin-staging.itisyou.app` has no application and no
+ * `CF_ACCESS_AUD`, and stays in the unconfigured state below.
  *
- * With no `CF_ACCESS_POLICY_AUD`, every request is refused with a message naming A0-1.
+ * That unconfigured state is therefore still live, still reachable, and still the one
+ * this module treats as most important. With no `CF_ACCESS_AUD`, every request is refused.
  * There is no environment in which that check is skipped, no `ENVIRONMENT === "staging"`
  * branch, and no development bypass. Each of those would be a runtime value, and a
  * runtime value that disables an authentication gate is a runtime value somebody will
@@ -91,7 +94,7 @@ export interface AccessIdentity {
 /** Read the Access configuration, or report that there is none. */
 export function accessConfig(env: Env): AccessConfig | null {
   const teamDomain = trimTrailingSlash(nonEmpty(env.CF_ACCESS_TEAM_DOMAIN));
-  const policyAud = nonEmpty(env.CF_ACCESS_POLICY_AUD);
+  const policyAud = nonEmpty(env.CF_ACCESS_AUD);
   if (!teamDomain || !policyAud) return null;
   return { teamDomain, policyAud };
 }
@@ -107,7 +110,7 @@ export async function verifyAccessJwt(request: Request, env: Env): Promise<Acces
   const config = accessConfig(env);
   if (!config) {
     /*
-      The fail-closed branch, and the reason `CF_ACCESS_POLICY_AUD` is typed optional.
+      The fail-closed branch, and the reason `CF_ACCESS_AUD` is typed optional.
 
       `internalDetail` names the blocking action rather than the missing variable. An
       operator reading this in a log needs to know an Access application has to be
@@ -116,7 +119,7 @@ export async function verifyAccessJwt(request: Request, env: Env): Promise<Acces
     */
     throw new ApiError("UNAVAILABLE", {
       publicMessage:
-        "This admin surface is not yet protected by Cloudflare Access and will not serve any request. Complete owner action A0-1: create the Access application for the admin hostnames and set CF_ACCESS_POLICY_AUD.",
+        "This admin surface is not yet protected by Cloudflare Access and will not serve any request. Create the Access application for this hostname and set CF_ACCESS_AUD as a Worker secret on this environment.",
       internalDetail: "access_not_configured: A0-1 outstanding",
     });
   }
