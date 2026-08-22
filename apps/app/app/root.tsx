@@ -16,12 +16,30 @@ import { nonceContext } from "./context/nonce";
 import { loadAuthState } from "./lib/auth.server";
 import "./app.css";
 
+/**
+ * The fonts are self-hosted, so there is no stylesheet link here at all — see
+ * `packages/ui/src/styles/fonts.css` for why. What remains is a preload of the two
+ * faces above the fold on every page: the headline face and the mono face that every
+ * error string, command and version tag is set in.
+ *
+ * Preloading only the latin subsets, and only those two: a preload that the page does
+ * not use immediately competes with the ones it does, which makes the fold slower
+ * rather than faster.
+ */
 export const links: LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
-  { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
   {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap",
+    rel: "preload",
+    href: "/fonts/geist-latin.19f9c925.woff2",
+    as: "font",
+    type: "font/woff2",
+    crossOrigin: "anonymous",
+  },
+  {
+    rel: "preload",
+    href: "/fonts/jetbrains-mono-latin.83c005d4.woff2",
+    as: "font",
+    type: "font/woff2",
+    crossOrigin: "anonymous",
   },
 ];
 

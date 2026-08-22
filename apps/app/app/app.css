@@ -1,4 +1,5 @@
 /* The whole design system. Tokens, base layer and component primitives all live in
    the ui package so the three apps cannot drift apart. */
+@import "@devyou/ui/styles/fonts.css";
 @import "@devyou/ui/styles/theme.css";
 @source "../../../packages/ui/src";

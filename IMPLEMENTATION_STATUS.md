@@ -425,5 +425,32 @@ adjust them knows what the numbers were chosen for.
 every page on the site and all four returned 404. A dead link in a persistent nav is a
 defect on every page at once. All four now exist and return 200.
 
-**Not yet done:** performance measurement. No Lighthouse or Core Web Vitals figures have
-been taken, so nothing in this phase claims a performance result.
+### Performance measured, and two defects fixed
+
+Evidence: [`docs/evidence/performance-2026-08-22.txt`](docs/evidence/performance-2026-08-22.txt).
+TTFB 39–133 ms across every public route; HTML 4–22 KB gzip; client bundle 127 KB gzip.
+
+1. **Every static asset was being revalidated on every navigation.** `withSecurityHeaders`
+   sets `immutable` for `/assets/`, and it was never running for them: Cloudflare's
+   static-asset server answers a matching path *before* the Worker does. Eleven
+   content-hashed JS/CSS files, `public, max-age=0, must-revalidate`, on every page
+   view by every repeat visitor. Fixed with an `_headers` file, which is the mechanism
+   that actually reaches the asset server.
+2. **Google Fonts was a render-blocking third party on every page.** One DNS lookup,
+   one TLS handshake and one round trip to `fonts.googleapis.com` before it named a
+   *second* host that needed its own — all on the critical path. The fonts are now
+   self-hosted, content-hashed and served `immutable` from the same connection as the
+   HTML, and `style-src`/`font-src` are down to `'self'`.
+
+   The second reason mattered more than the first: every page view was sending the
+   reader's IP and user-agent to a third party, on a product whose About page tells
+   people it does not join their data to anything. Removing the request is the only
+   version of that claim that is checkable.
+
+   232 KB of distinct font bytes, latin and latin-ext only, deduplicated from the
+   740 KB Google serves — it returns the same variable-font binary under a different
+   name per weight.
+
+**Not done:** no Lighthouse or field Core Web Vitals run. The figures above are real
+measurements from one client at one location and are stated as that, not as a lab
+score.

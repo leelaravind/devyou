@@ -46,8 +46,17 @@ export function contentSecurityPolicy(options: CspOptions): string {
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${options.nonce}' 'strict-dynamic'`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline'",
+    /*
+      No font host, and no stylesheet host.
+
+      The fonts are self-hosted (see `packages/ui/src/styles/fonts.css`), so these
+      directives are `'self'` and nothing else. That is worth more than the two lines
+      it saves: an allowed origin in `style-src` is an origin that can restyle this
+      page, and an allowed origin in `font-src` is a third party that sees every
+      reader's IP. Neither was buying anything the product could not host itself.
+    */
+    "font-src 'self'",
     // No remote image host. See above — every permitted origin is a tracking and
     // exfiltration channel on a page rendering somebody else's content.
     "img-src 'self' data:",
@@ -160,5 +169,13 @@ export function newCspNonce(): string {
 }
 
 export function isImmutableAsset(pathname: string): boolean {
-  return pathname.startsWith("/assets/") || pathname === "/favicon.ico";
+  /*
+    `/fonts/` qualifies because the filenames carry a content hash, exactly as Vite's
+    `/assets/` do. Without the hash this would be a lie with a year-long expiry — the
+    worst kind of caching bug, because it is unfixable from the server side once a
+    browser has stored it.
+  */
+  return (
+    pathname.startsWith("/assets/") || pathname.startsWith("/fonts/") || pathname === "/favicon.ico"
+  );
 }

@@ -1,0 +1,49 @@
+Performance measurement — https://dev-staging.itisyou.app
+Taken 2026-08-22, after self-hosting fonts and fixing static-asset caching.
+Method: curl from a single client. TTFB is time_starttransfer; sizes are the
+gzip transfer size the browser would receive. No synthetic lab, no throttling —
+these are real numbers from one location, and they are stated as such.
+
+PATH                                             TTFB(s)       HTML  HTML gzip
+/                                                  0.039      18691       4905
+/search?q=SQLITE_BUSY%3A%20database%20is%20lo      0.133      56690      10035
+/p/d1-sqlite-busy-concurrent-writes                0.127      52935      10302
+/p/d1-sqlite-busy-concurrent-writes/diagnose       0.083      26192       7530
+/p/d1-sqlite-busy-concurrent-writes/evidence       0.131      24306       7525
+/playbooks                                         0.106     133841      22209
+/how-verification-works                            0.041      23753       6850
+/about                                             0.040      14656       4224
+/contribute                                        0.051      16932       4840
+
+Client bundle, playbook page (gzip transfer):
+  /assets/entry.client-BAT9sDZs.js                  57797
+  /assets/errorBoundaries-DI8SEXrG.js               11552
+  /assets/home--q4LXDH0.js                           1998
+  /assets/jsx-runtime-BpOKJjsI.js                   27614
+  /assets/lib-KpLidi6j.js                            4396
+  /assets/manifest-10f940e8.js                       1075
+  /assets/p._slug-CnpMaAht.js                        4103
+  /assets/root-CMIYMpnY.js                           1539
+  /assets/root-D3vjAuI_.css                          7242
+  /assets/src-CGTn0Wbm.js                            7513
+  /assets/src-DPZTMQrv.js                            2200
+  ---
+  TOTAL                                            127029
+
+Fonts (self-hosted, content-hashed, immutable):
+  /fonts/geist-latin.19f9c925.woff2                 29400
+  /fonts/geist-latin-ext.824f485b.woff2             16512
+  /fonts/inter-latin.3100e775.woff2                 48256
+  /fonts/inter-latin-ext.34b9c504.woff2             85068
+  /fonts/jetbrains-mono-latin.83c005d4.woff2        31432
+  /fonts/jetbrains-mono-latin-ext.db5ff4db.woff2    11624
+
+Cache headers:
+  /assets/*                                      public, max-age=31536000, immutable
+  /fonts/*                                       public, max-age=31536000, immutable
+  playbook page, anonymous                       public, max-age=60, s-maxage=300, stale-while-revalidate=86400
+  playbook page, session cookie                  no-store
+
+Third-party requests on any page: none. No external stylesheet, font host,
+image host, analytics or connect origin — the CSP allows only 'self' plus the
+Turnstile frame, so this is enforced rather than merely observed.

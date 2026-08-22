@@ -1,0 +1,30 @@
+# Cache headers for static assets.
+#
+# This file exists because of a real, measured defect: `withSecurityHeaders` in
+# `workers/app.ts` sets `immutable` for `/assets/` and `/fonts/`, and it was never
+# running for either. Cloudflare's static-asset server answers a matching path
+# *before* the Worker does, so every content-hashed bundle was being served with
+# `public, max-age=0, must-revalidate` — a full revalidation round trip for all
+# eleven JS/CSS files on every navigation by every repeat visitor.
+#
+# `_headers` is the mechanism that reaches the asset server, so the policy has to
+# live here as well as in the Worker. That duplication is unfortunate and the
+# alternative is worse: routing every asset request through the Worker to set one
+# header would spend CPU on files the platform is designed to serve without it.
+#
+# Both directories are safe to mark immutable because every filename in them
+# carries a content hash — Vite generates them for `/assets/`, and
+# `packages/ui/src/styles/fonts.css` documents why `/fonts/` does too. Marking a
+# stable filename immutable is the one caching mistake that cannot be corrected
+# from the server side afterwards.
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Everything else the asset server handles is a one-off file at a stable name, so
+# it revalidates rather than pinning.
+/favicon.ico
+  Cache-Control: public, max-age=86400
