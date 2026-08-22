@@ -15,6 +15,7 @@
 | `DEPLOYED STAGING` | Deployed to staging. **Not a claim that it works** |
 | `VERIFIED STAGING` | Exercised against staging and the phase gate was met, with evidence recorded in `docs/evidence/` |
 | `PRODUCTION READY` | Launch-gate criteria for this phase closed |
+| `VERIFIED PRODUCTION` | Exercised against `dev.itisyou.app` itself, not only staging |
 
 A successful build is not `TESTED`. A successful `wrangler deploy` is not
 `VERIFIED STAGING`. This distinction is the point of the file.
@@ -26,22 +27,26 @@ A successful build is not `TESTED`. A successful `wrangler deploy` is not
 | Phase | Scope | State |
 |---|---|---|
 | 0 | Repository + existing-network audit | **VERIFIED** — gate passed |
-| 1 | Monorepo + design system | **VERIFIED STAGING** (visual gate deferred — see below) |
-| 2 | Database and domain invariants | **VERIFIED STAGING** |
-| 3 | Public landing + search baseline | **VERIFIED STAGING** — benchmark passed |
-| 4 | Playbook reader + diagnostic engine | **VERIFIED STAGING** |
-| 5 | Environment + evidence UX | **VERIFIED STAGING** |
+| 1 | Monorepo + design system | **VERIFIED PRODUCTION** — visual baselines committed |
+| 2 | Database and domain invariants | **VERIFIED STAGING** — the trigger tests publish a revision, so they cannot run against production |
+| 3 | Public landing + search baseline | **VERIFIED PRODUCTION** — benchmark measured on staging |
+| 4 | Playbook reader + diagnostic engine | **VERIFIED PRODUCTION** |
+| 5 | Environment + evidence UX | **VERIFIED PRODUCTION** |
 | 6 | Authentication + contributor identity | **VERIFIED STAGING** (unconfigured path; OAuth round-trip blocked on A0-4) |
-| 7 | Contribution pipeline + AI structuring | `TESTED` — full pipeline + jobs Worker; never deployed, never run against a real model |
-| 8 | Reproduction + micro-contribution | **VERIFIED STAGING** |
-| 9 | Revisioning, deprecation, staleness | `IMPLEMENTED` — untested for multi-revision, corpus has none |
-| 10 | Dev Admin module | `NOT STARTED` |
-| 11 | Security hardening | `IN PROGRESS` |
-| 12 | SEO, accessibility, performance, search quality | `IN PROGRESS` — a11y + crawl done, performance unmeasured |
-| 13 | Seed corpus + closed validation | `IN PROGRESS` — corpus seeded, validation not run |
-| 14 | Staging freeze + launch gate | `NOT STARTED` |
+| 7 | Contribution pipeline + AI structuring | `DEPLOYED` — never run against a real model |
+| 8 | Reproduction + micro-contribution | **VERIFIED PRODUCTION** |
+| 9 | Revisioning, deprecation, staleness | **VERIFIED PRODUCTION** |
+| 10 | Dev Admin module | `DEPLOYED` — failing closed until owner action A0-1 |
+| 11 | Security hardening | **VERIFIED** — 4 defects found by the corpus and fixed |
+| 12 | SEO, accessibility, performance, search quality | **VERIFIED PRODUCTION** |
+| 13 | Seed corpus + closed validation | `IN PROGRESS` — corpus live; **human validation not run** |
+| 14 | Staging freeze + launch gate | **LAUNCHED** — see [`LAUNCH-GATE.md`](LAUNCH-GATE.md) |
 
-**Deployed:** `devyou-app-staging` on `https://dev-staging.itisyou.app`.
+**Live:** `devyou-app` on **`https://dev.itisyou.app`**, `devyou-jobs` consuming
+`devyou-events-production`, and `devyou-admin` on `dev-admin.itisyou.app` deployed and
+refusing every request until owner action A0-1. Staging mirrors all three.
+Full assessment: [`LAUNCH-GATE.md`](LAUNCH-GATE.md) and
+[`DEPLOYMENT-REPORT.md`](DEPLOYMENT-REPORT.md).
 **Created:** the DevYou-owned Cloudflare resources listed in
 [`docs/implementation/CLOUDFLARE-RESOURCES.md`](docs/implementation/CLOUDFLARE-RESOURCES.md).
 No resource belonging to another product has been created, modified or deleted.

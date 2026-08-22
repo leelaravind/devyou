@@ -14,7 +14,7 @@
     "test:unit": "vitest run",
     "build:staging": "cross-env CLOUDFLARE_ENV=staging react-router build",
     "deploy:staging": "pnpm run build:staging && wrangler deploy --env staging",
-    "deploy:production": "cross-env CLOUDFLARE_ENV=production react-router build && wrangler deploy"
+    "deploy:production": "react-router build && wrangler deploy"
   },
   "dependencies": {
     "@devyou/admin-contract": "workspace:*",
