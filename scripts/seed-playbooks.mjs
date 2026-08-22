@@ -69,7 +69,38 @@ const playbooks = files.flatMap((file) => {
   return parsed.playbooks ?? [];
 });
 
-console.log(`\nSeeding ${playbooks.length} playbooks into ${database}…\n`);
+/*
+  Already-published playbooks are skipped, not re-inserted.
+
+  `INSERT OR IGNORE` is not enough on a second run: the immutability trigger fires
+  BEFORE INSERT and rejects a node aimed at a published revision regardless of
+  whether the row would have been ignored as a duplicate. That is the trigger
+  working exactly as intended — a published revision cannot gain a node — so this
+  script is add-only rather than idempotent-by-overwrite. Changing a seeded playbook
+  means publishing a new revision, the same as it does for any contributor.
+*/
+const alreadyPublished = new Set(
+  rows(
+    "SELECT p.slug FROM playbooks p JOIN playbook_revisions r ON r.id = p.current_revision_id" +
+      " WHERE r.published_at IS NOT NULL;",
+  ).map((row) => row.slug),
+);
+
+const pending = playbooks.filter((playbook) => !alreadyPublished.has(playbook.slug));
+
+if (pending.length === 0) {
+  console.log(
+    `\nAll ${playbooks.length} playbooks are already published in ${database}. Nothing to do.\n` +
+      "To change one, publish a new revision — published revisions are immutable.\n",
+  );
+  process.exit(0);
+}
+
+console.log(
+  `\nSeeding ${pending.length} new playbook(s) into ${database}` +
+    (alreadyPublished.size > 0 ? ` (${alreadyPublished.size} already published, skipped)` : "") +
+    "…\n",
+);
 
 const statements = [
   `INSERT OR IGNORE INTO users (id, created_at, status, role)
@@ -82,7 +113,7 @@ const statements = [
 let nodeCount = 0;
 let edgeCount = 0;
 
-for (const playbook of playbooks) {
+for (const playbook of pending) {
   const key = playbook.slug.replace(/-/g, "_");
   const problemId = `prb_${key}`;
   const playbookId = `pbk_${key}`;

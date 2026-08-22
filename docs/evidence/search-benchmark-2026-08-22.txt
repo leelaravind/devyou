@@ -1,0 +1,43 @@
+
+Search benchmark → https://dev-staging.itisyou.app
+57 queries
+
+!!!!!!!!!!+!x!+!!!!+!!!!!!!+x+!!!!!+!!!!!xx+!!x!!+!!x!...
+
+  MRR                 0.809
+  hit@1               74.1%
+  hit@3               88.9%   (target 70.0%)
+  hit@5               88.9%
+  zero-result rate    9.3%   (ceiling 15.0%)
+  false-positive rate 0.0%   (ceiling 34.0%)
+
+  by query shape:
+    exact_error        n= 5  MRR 1.00  hit@3 100.0%
+    natural_language   n=28  MRR 0.76  hit@3 82.1%
+    mixed              n= 5  MRR 0.77  hit@3 100.0%
+    stack_trace        n= 8  MRR 0.75  hit@3 87.5%
+    log                n= 8  MRR 0.94  hit@3 100.0%
+
+  6 query(ies) found nothing relevant:
+    q013 [stack_trace] Exception in thread "main" java.lang.OutOfMemoryError: Java heap space
+      wanted: k8s-oomkilled-memory-limit
+      got:    bun-panic-main-thread-native-module, node-heap-out-of-memory, workers-error-1101-uncaught-exception
+    q029 [natural_language] export default {
+      wanted: workers-io-object-different-request
+      got:    (nothing)
+    q042 [natural_language] durable object websocket keeps disconnecting every time I deploy a new
+      wanted: do-reset-code-update-websocket-drop
+      got:    (nothing)
+    q043 [natural_language] why does my d1 database say the table doesn't exist even though I defi
+      wanted: d1-migration-not-applied-no-such-table
+      got:    (nothing)
+    q047 [natural_language] our ingress randomly returns gateway timeouts whenever traffic spikes
+      wanted: nginx-ingress-504-gateway-timeout
+      got:    (nothing)
+    q053 [natural_language] cannot find module right after a fresh clone even though npm install f
+      wanted: node-cannot-find-module-missing-install
+      got:    (nothing)
+
+Benchmark PASSES the agreed targets.
+
+

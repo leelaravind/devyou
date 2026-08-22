@@ -92,6 +92,46 @@ export async function runSearch(
     exact.push(...rows.results.map((row) => toHit(row, "error_code", 0.5)));
   }
 
+  /*
+    The scope gate.
+
+    A prose query that names no technology this corpus covers gets nothing, and the
+    zero-result page says why.
+
+    This exists because the benchmark caught the alternative behaving badly: every
+    deliberately-unanswerable query returned results. The lexical stage ORs its
+    terms, so "how do I centre a div" matches a Postgres deadlock playbook on the
+    strength of "do" and "how" — and scores it *better* than a genuine prose query
+    about connection pooling scores its correct answer. No score threshold separates
+    those two cases; the distributions overlap.
+
+    What does separate them is scope. Coverage here is deliberately narrow and deep
+    (plan §20), so "this query is about nothing we cover" is a true and useful
+    answer, and the zero-result page is built to make it useful — it names what to
+    try and offers to start a playbook. Returning the least-bad match instead
+    teaches a reader that the search does not work, which is the more expensive
+    mistake.
+
+    Only applied to natural-language queries. Anything carrying an error code, an
+    exception or a stack frame goes through regardless: an unrecognised error string
+    is exactly the case where a weak lexical match might still be the right one.
+  */
+  if (
+    query.shape === "natural_language" &&
+    query.errorCodes.length === 0 &&
+    query.exceptionTypes.length === 0 &&
+    !(await mentionsCoveredTechnology(db, query.ftsTerms))
+  ) {
+    const latencyMs = Date.now() - startedAt;
+    return {
+      query,
+      hits: [],
+      total: 0,
+      advice: adviseOnZeroResults(query, filters),
+      latencyMs,
+    };
+  }
+
   let lexical: SearchHit[] = [];
   const match = buildMatchExpression(query);
   if (stages.includes("lexical") && match) {
@@ -309,4 +349,55 @@ export async function recordSearchEvent(
       Math.floor(Date.now() / 1000),
     )
     .run();
+}
+
+/**
+ * Does the query name any technology this corpus actually covers?
+ *
+ * Matches the query's terms against `technologies.name`, `technologies.slug` and
+ * `technology_aliases.alias` — the alias table is what makes this work, because it
+ * carries the error tokens and binary names people actually type.
+ *
+ * One indexed lookup with an IN list, not a LIKE scan: this runs on the search path
+ * and a scan over the alias table per query would be a cost paid on every search to
+ * answer a question that is usually "no".
+ */
+async function mentionsCoveredTechnology(
+  db: D1Database,
+  terms: readonly string[],
+): Promise<boolean> {
+  const candidates = terms
+    .map((term) => (term.startsWith('"') ? term.slice(1, -1) : term))
+    .map((term) => term.toLowerCase())
+    .filter((term) => term.length >= 2 && term.length <= 60)
+    .slice(0, 24);
+
+  if (candidates.length === 0) return false;
+
+  /*
+    The list is bound once, and the same numbered placeholders are reused in all
+    three IN clauses.
+
+    `?1…?N` refer to binding positions, not to occurrences, so repeating the
+    placeholders costs nothing — but binding the values three times to match the
+    three occurrences is an arity error. That mistake turned every natural-language
+    search into a 500, and the benchmark reported it as a zero-result rate rather
+    than as an outage, because an error page contains no result links either. Worth
+    remembering: a metric that counts "found nothing" cannot tell you the page was
+    broken.
+  */
+  const placeholders = candidates.map((_, index) => `?${index + 1}`).join(", ");
+
+  const row = await db
+    .prepare(
+      `SELECT 1 AS hit FROM technologies
+        WHERE lower(name) IN (${placeholders}) OR lower(slug) IN (${placeholders})
+       UNION ALL
+       SELECT 1 FROM technology_aliases WHERE lower(alias) IN (${placeholders})
+       LIMIT 1`,
+    )
+    .bind(...candidates)
+    .first<{ hit: number }>();
+
+  return row !== null;
 }

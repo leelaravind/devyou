@@ -1,0 +1,650 @@
+{
+  "$comment": "DevYou seed playbook corpus: containers, Kubernetes, and Node/Bun runtime problems. Consumed by scripts/seed-playbooks.mjs. technologies/constraints[].technology values must be slugs from packages/config/taxonomy/technologies.json. node.type/edge.condition values must be members of NODE_TYPES/BRANCH_CONDITIONS in packages/core/src/vocabulary.ts, and every graph here is written to pass packages/domain/src/graph.ts's validateGraph.",
+  "playbooks": [
+    {
+      "slug": "k8s-crashloopbackoff-generic",
+      "problemTitle": "Pod stuck in CrashLoopBackOff",
+      "problemSummary": "A pod repeatedly restarts and Kubernetes reports CrashLoopBackOff. The underlying cause varies widely (OOM kill, failing liveness probe, bad command, missing config or secret, or a non-long-running entrypoint) and has to be read off the pod's own Last State and Events before it can be fixed.",
+      "title": "Triaging CrashLoopBackOff to its actual cause",
+      "summary": "Uses kubectl describe pod's Last State reason, exit code and Events to sort a CrashLoopBackOff into one of five common causes and points at the right next step for each. It deliberately does not fix any of them in depth — the OOM branch, for instance, defers to the dedicated OOMKilled playbook — and it does not cover ImagePullBackOff, FailedScheduling or CreateContainerConfigError, which are different pod conditions with their own playbooks.",
+      "symptoms": [
+        "kubectl get pods shows STATUS CrashLoopBackOff with a RESTARTS count that keeps climbing",
+        "The pod cycles between Waiting and Running for only a few seconds at a time",
+        "kubectl describe pod Events repeat 'Back-off restarting failed container'"
+      ],
+      "signatures": [
+        { "errorCode": "CrashLoopBackOff", "normalisedMessage": "back-off restarting failed container", "languageHint": null, "runtimeHint": "kubernetes" }
+      ],
+      "technologies": ["kubernetes", "kubectl"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Pod is stuck in CrashLoopBackOff", "body": "This triages a CrashLoopBackOff down to one of five common causes — OOM kill, failing liveness probe, a bad command/args override, a missing config value or secret, or an image whose entrypoint isn't a long-running process — using the pod's own Last State and Events rather than guessing from the symptom name alone." },
+        { "id": "triage", "type": "observation", "title": "Read the Last State reason and exit code", "body": "kubectl describe pod is more reliable here than logs — the Last State block records the exit code and OOM flag even after the container has already been replaced. Exit Code 137 + Reason OOMKilled means memory. Exit Code 0/143 with repeated 'Unhealthy' Warning events before each restart means the liveness probe, not the process, is killing it. Exit Code 127, or an event reading 'OCI runtime exec failed: exec: \"<cmd>\": executable file not found in $PATH', means the configured command/args don't match a binary the image actually has. An app-level error in `kubectl logs --previous` about a missing environment variable, file, or connection string means missing config. Exit Code 0 with no OOM or probe warnings, and the container only staying up a few seconds each time, means the image's own entrypoint isn't a long-running foreground process.", "command": "kubectl describe pod <pod-name> -n <namespace>", "commandLanguage": "sh", "expectedOutput": "State:          Waiting\n  Reason:       CrashLoopBackOff\nLast State:     Terminated\n  Reason:       OOMKilled\n  Exit Code:    137\nReady:          False\nRestart Count:  6\nEvents:\n  Warning  BackOff  6s (x12 over 4m)  kubelet  Back-off restarting failed container", "safetyLevel": "informational" },
+        { "id": "oom", "type": "root_cause", "title": "Root cause: the container was OOM-killed", "body": "Last State Reason is OOMKilled and Exit Code is 137 — the kernel's cgroup OOM killer sent SIGKILL because the container tried to use more memory than its configured limit. This branch is confirmation, not the fix: the dedicated OOMKilled playbook covers sizing the limit correctly and telling a genuine leak apart from an undersized limit." },
+        { "id": "probe", "type": "root_cause", "title": "Root cause: the liveness probe is killing an otherwise-working container", "body": "Exit Code is usually 0 or 143 and Events show repeated 'Unhealthy' warnings from the liveness probe before each restart — kubelet is restarting the container because the probe failed, not because the process crashed on its own. Check initialDelaySeconds, timeoutSeconds and failureThreshold on the pod's livenessProbe: a probe that fires before the app finishes starting, or that has too short a timeout under load, produces exactly this pattern. A missing readinessProbe alongside it means traffic also hits the pod during the same slow-start window.", "command": "kubectl get pod <pod-name> -n <namespace> -o jsonpath='{.spec.containers[0].livenessProbe}'", "commandLanguage": "sh", "expectedOutput": "{\"httpGet\":{\"path\":\"/healthz\",\"port\":8080},\"initialDelaySeconds\":2,\"timeoutSeconds\":1,\"failureThreshold\":1,\"periodSeconds\":5}", "safetyLevel": "informational" },
+        { "id": "badcmd", "type": "root_cause", "title": "Root cause: the container's command or args are wrong", "body": "Exit Code 127, or the event text 'OCI runtime exec failed: exec: \"<cmd>\": executable file not found in $PATH', means the command/args set in the pod or container spec don't match a binary that actually exists in the image — commonly a typo, a path that changed between image versions, or a debugging override that was never removed. Compare the spec against what the image actually ships.", "command": "kubectl get pod <pod-name> -n <namespace> -o jsonpath='{.spec.containers[0].command}{\" \"}{.spec.containers[0].args}'", "commandLanguage": "sh", "expectedOutput": "[/app/bin/servr] []", "safetyLevel": "informational" },
+        { "id": "missingcfg", "type": "root_cause", "title": "Root cause: the app is crashing on a missing config value or secret", "body": "The container starts, runs briefly, then exits with an application-level error referencing a missing environment variable, config file, or connection string — not an OOM or probe signal. Usually a ConfigMap/Secret key referenced by envFrom or env.valueFrom doesn't exist or wasn't updated after a rename, or a required setting simply wasn't provided in this environment. This is distinct from CreateContainerConfigError, a Waiting-state condition shown before the container ever starts at all — if you see that reason instead, the fix is the same (check the referenced ConfigMap/Secret) but the pod never actually ran.", "command": "kubectl logs <pod-name> -n <namespace> --previous", "commandLanguage": "sh", "expectedOutput": "Error: environment variable DATABASE_URL is required but was not set\n    at loadConfig (/app/src/config.js:14:11)", "safetyLevel": "informational" },
+        { "id": "entrypoint", "type": "root_cause", "title": "Root cause: the image's entrypoint isn't a long-running process", "body": "Exit Code is 0, there are no OOM or probe warnings, and the container only stays up for a few seconds each time — the process the image runs completes and exits normally, which Kubernetes treats as a crash because a pod's container is expected to keep running in the foreground. This happens most often with an image built for a one-shot task (a migration, a setup script) deployed as a Deployment/ReplicaSet instead of a Job, or a custom command that backgrounds the real process and returns immediately. Run it as a Job/CronJob if it's meant to finish, or make the entrypoint exec the long-running process in the foreground." },
+        { "id": "unclear", "type": "terminal", "title": "None of these match — treat it as an application bug", "body": "If the exit code and events don't fit any of the patterns above, kubectl logs <pod-name> -n <namespace> --previous is the next step — the previous container's stdout/stderr almost always contains the real application error. From here this stops being a generic Kubernetes problem and becomes whatever that error says." }
+      ],
+      "edges": [
+        { "from": "start", "to": "triage", "condition": "passed" },
+        { "from": "triage", "to": "oom", "condition": "different_output", "label": "Exit Code 137 / Reason: OOMKilled" },
+        { "from": "triage", "to": "probe", "condition": "different_output", "label": "Repeated Unhealthy events before each restart" },
+        { "from": "triage", "to": "badcmd", "condition": "different_output", "label": "Exit Code 127 / executable file not found" },
+        { "from": "triage", "to": "missingcfg", "condition": "different_output", "label": "App-level error about missing config/secret" },
+        { "from": "triage", "to": "entrypoint", "condition": "different_output", "label": "Exit Code 0, no OOM/probe warnings" },
+        { "from": "triage", "to": "unclear", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://kubernetes.io/docs/tasks/debug/debug-application/debug-running-pod/", "title": "Debug Running Pods", "type": "official_docs", "publisher": "Kubernetes" }
+      ]
+    },
+    {
+      "slug": "k8s-oomkilled-memory-limit",
+      "problemTitle": "Pod repeatedly OOMKilled",
+      "problemSummary": "A container is terminated with Last State Reason OOMKilled and Exit Code 137 because it tried to use more memory than its configured limit, and the fix depends on whether usage is genuinely too high from the start or grows over the container's lifetime.",
+      "title": "Diagnosing and fixing an OOMKilled container",
+      "summary": "Confirms a genuine OOM kill from kubectl describe pod, then distinguishes a memory limit that's simply undersized from a leak-shaped growth pattern that raising the limit would only delay. Covers raising the memory request/limit as a concrete fix; it does not do in-app memory profiling or cover node-level memory pressure evictions, which are a different mechanism from a per-container limit kill.",
+      "symptoms": [
+        "kubectl get pods shows a pod restarting with Last State Reason OOMKilled",
+        "Exit Code 137 in kubectl describe pod's Last State block",
+        "kubectl top pod shows memory usage climbing toward the configured limit before each restart"
+      ],
+      "signatures": [
+        { "errorCode": "OOMKilled", "normalisedMessage": "last state: terminated reason: oomkilled exit code: 137", "languageHint": null, "runtimeHint": "kubernetes" }
+      ],
+      "technologies": ["kubernetes", "kubectl"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Container is repeatedly OOMKilled", "body": "Before touching the limit, confirm this is actually an OOM kill and work out whether usage is undersized-from-the-start or grows over time — raising the limit fixes the first and only delays the second." },
+        { "id": "confirm", "type": "test", "title": "Confirm OOMKilled and read the configured limit", "body": "Check that Last State really is Terminated/OOMKilled with Exit Code 137, and note the memory limit the container is actually running under.", "command": "kubectl describe pod <pod-name> -n <namespace>", "commandLanguage": "sh", "expectedOutput": "Last State:     Terminated\n  Reason:       OOMKilled\n  Exit Code:    137\nLimits:\n  memory:  256Mi\nRequests:\n  memory:  256Mi", "safetyLevel": "informational" },
+        { "id": "not-oom", "type": "terminal", "title": "This isn't an OOM kill", "body": "Last State Reason wasn't OOMKilled or Exit Code wasn't 137 — this playbook only covers genuine OOM kills. Re-read the Last State block; a different reason belongs in the CrashLoopBackOff triage playbook instead." },
+        { "id": "pattern", "type": "test", "title": "Does memory usage grow across the container's lifetime before the kill, or is it high from the moment the container starts?", "body": "Watch kubectl top pod --containers over several minutes (or a metrics dashboard if you have one). A steady climb toward the limit is leak-shaped; being close to the limit within seconds of starting is not.", "command": "kubectl top pod <pod-name> -n <namespace> --containers", "commandLanguage": "sh", "expectedOutput": "POD              NAME   CPU(cores)   MEMORY(bytes)\n<pod-name>       app    120m         248Mi", "safetyLevel": "informational" },
+        { "id": "leak", "type": "root_cause", "title": "Root cause: memory grows over the container's lifetime (leak-shaped)", "body": "This looks like the app not releasing memory — unbounded caches, accumulating event listeners, or a queue with no eviction — rather than the limit being wrong. Raising the limit only delays the kill. From here it's an application-level memory investigation (heap/allocation profiling appropriate to the runtime, or comparing against a previous known-good build), not a Kubernetes-level fix." },
+        { "id": "undersized", "type": "fix", "title": "Fix: raise the memory request and limit to match the real working set", "body": "If usage is high immediately and stays roughly flat rather than climbing, the limit is simply set below what the container needs. Raise both request and limit — leaving the request far below the limit is what let the pod get scheduled onto a node that then couldn't actually give it the memory it needed.", "command": "kubectl set resources deployment/<deployment-name> -c=<container-name> --limits=memory=512Mi --requests=memory=512Mi -n <namespace>", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Patches the deployment's pod template with the new memory request and limit, which triggers a rolling restart of the deployment's pods." },
+        { "id": "unclear", "type": "terminal", "title": "Can't tell yet which pattern this is", "body": "If there isn't enough history to tell growth-over-time from high-from-the-start, temporarily raise the limit and watch memory over a longer window, or add basic heap/allocation logging in the app before deciding which branch applies." }
+      ],
+      "edges": [
+        { "from": "start", "to": "confirm", "condition": "passed" },
+        { "from": "confirm", "to": "pattern", "condition": "passed" },
+        { "from": "confirm", "to": "not-oom", "condition": "failed" },
+        { "from": "confirm", "to": "not-oom", "condition": "unknown" },
+        { "from": "pattern", "to": "leak", "condition": "passed" },
+        { "from": "pattern", "to": "undersized", "condition": "failed" },
+        { "from": "pattern", "to": "unclear", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://kubernetes.io/docs/tasks/configure-pod-container/assign-memory-resource/", "title": "Assign Memory Resources to Containers and Pods", "type": "official_docs", "publisher": "Kubernetes" }
+      ]
+    },
+    {
+      "slug": "k8s-imagepullbackoff-private-registry",
+      "problemTitle": "Pod stuck in ImagePullBackOff pulling from a private registry",
+      "problemSummary": "Kubernetes cannot authenticate to a private image registry to pull the pod's image, which is a credential-wiring problem specific to the pod (imagePullSecrets), separate from whether the same image can be pulled from a developer's own machine.",
+      "title": "Fixing ImagePullBackOff caused by private-registry credentials",
+      "summary": "Walks from the exact pull error through the pod's imagePullSecrets to the actual Secret content, fixing a missing secret reference, an expired token, or a wrong registry host/namespace. It explicitly does not cover a missing or mistyped image tag ('manifest unknown', 'repository does not exist') — that's a different error and a different fix — and it is not a general Docker registry-login guide: a successful `docker pull` on a developer's laptop proves the credentials are valid outside the cluster, it does not prove the pod itself has them wired up.",
+      "symptoms": [
+        "kubectl get pods shows STATUS ImagePullBackOff or ErrImagePull",
+        "kubectl describe pod Events show 'Failed to pull image' with 'pull access denied' or 'unauthorized'",
+        "The same image pulls successfully with docker pull on a developer's own machine"
+      ],
+      "signatures": [
+        { "errorCode": "ImagePullBackOff", "normalisedMessage": "failed to pull image: pull access denied, repository does not exist or may require authorization", "languageHint": null, "runtimeHint": "kubernetes" },
+        { "errorCode": "ErrImagePull", "normalisedMessage": "rpc error: code = unknown desc = failed to pull and unpack image: unauthorized", "languageHint": null, "runtimeHint": "kubernetes" }
+      ],
+      "technologies": ["kubernetes", "kubectl"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Pod stuck in ImagePullBackOff pulling from a private registry", "body": "A working `docker pull` of the same image on a developer's laptop is a red herring for this branch of the problem — it only proves the registry credentials are valid somewhere, not that the pod has them. Kubelet pulls images using the pod's own imagePullSecrets (or its ServiceAccount's), which is a completely separate credential path." },
+        { "id": "read-error", "type": "test", "title": "Read the exact pull error", "body": "Confirm the Events line is actually an authentication/authorization failure and not a different kind of pull error.", "command": "kubectl describe pod <pod-name> -n <namespace>", "commandLanguage": "sh", "expectedOutput": "Warning  Failed  8s (x4 over 47s)  kubelet  Failed to pull image \"registry.example.com/team/app:1.4.2\": rpc error: code = Unknown desc = failed to pull and unpack image \"registry.example.com/team/app:1.4.2\": failed to resolve reference: pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed", "safetyLevel": "informational" },
+        { "id": "wrong-image", "type": "terminal", "title": "This isn't a credentials problem", "body": "If the error instead reads something like 'manifest unknown', 'repository does not exist' without an authorization message, or names a tag that clearly doesn't exist, the image reference itself is wrong. Fix the image name/tag in the pod spec — the credential-wiring steps below won't help." },
+        { "id": "has-secret", "type": "test", "title": "Confirm the pod actually references an imagePullSecrets entry", "body": "Check whether the pod spec (directly, or via its ServiceAccount) has any imagePullSecrets configured at all.", "command": "kubectl get pod <pod-name> -n <namespace> -o jsonpath='{.spec.imagePullSecrets}'", "commandLanguage": "sh", "expectedOutput": "[]", "safetyLevel": "informational" },
+        { "id": "no-secret-attached", "type": "fix", "title": "Fix: attach an image pull secret to the namespace's default ServiceAccount", "body": "If nothing is referenced at all, the most durable fix is attaching the secret to the ServiceAccount so every pod in the namespace picks it up automatically, rather than editing every pod spec individually. Any pod already running still needs to be deleted and recreated to pick this up.", "command": "kubectl patch serviceaccount default -n <namespace> -p '{\"imagePullSecrets\": [{\"name\": \"regcred\"}]}'", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Adds the image pull secret to the namespace's default ServiceAccount; pods created after this pick it up automatically, but the current failing pod still needs to be deleted (or its Deployment rolled) to actually retry the pull with it." },
+        { "id": "secret-content", "type": "test", "title": "Check the referenced secret exists in this namespace with the right registry host", "body": "imagePullSecrets are namespace-scoped — a secret created in one namespace is invisible to pods in another, which is one of the most common reasons this looks broken despite 'having a secret'.", "command": "kubectl get secret <secret-name> -n <namespace> --type=kubernetes.io/dockerconfigjson -o jsonpath='{.data.\\.dockerconfigjson}' | base64 -d", "commandLanguage": "sh", "expectedOutput": "{\"auths\":{\"registry.example.com\":{\"username\":\"deploy-bot\",\"password\":\"***\",\"auth\":\"ZGVwbG95LWJvdDoqKio=\"}}}", "safetyLevel": "informational" },
+        { "id": "stale-token", "type": "fix", "title": "Fix: the token is stale — regenerate the secret with current credentials", "body": "The secret exists, is in the right namespace, and names the right registry host, but the pull still fails as unauthorized — the embedded token/password has most likely expired or been rotated since the secret was created. Recreate it with a currently valid credential.", "command": "kubectl create secret docker-registry regcred \\\n  --docker-server=registry.example.com \\\n  --docker-username=<username> \\\n  --docker-password=<token> \\\n  --docker-email=<email> \\\n  -n <namespace> \\\n  --dry-run=client -o yaml | kubectl apply -f -", "commandLanguage": "sh", "safetyLevel": "credential_sensitive", "safetyEffect": "Overwrites the existing 'regcred' Secret in this namespace with the newly supplied registry credentials; anyone able to read Secrets in this namespace can read the embedded password after this runs." },
+        { "id": "wrong-secret", "type": "fix", "title": "Fix: the secret is missing, in the wrong namespace, or has the wrong registry host", "body": "Recreate the secret in the correct namespace with --docker-server set to exactly the host used in the image reference (for example ghcr.io if the image is ghcr.io/org/app:tag) — a mismatched host is silently ignored by kubelet's credential lookup.", "command": "kubectl create secret docker-registry regcred \\\n  --docker-server=<exact-registry-host> \\\n  --docker-username=<username> \\\n  --docker-password=<token> \\\n  --docker-email=<email> \\\n  -n <namespace> \\\n  --dry-run=client -o yaml | kubectl apply -f -", "commandLanguage": "sh", "safetyLevel": "credential_sensitive", "safetyEffect": "Creates or overwrites the 'regcred' Secret in this namespace with the supplied registry credentials; anyone able to read Secrets in this namespace can read the embedded password after this runs." }
+      ],
+      "edges": [
+        { "from": "start", "to": "read-error", "condition": "passed" },
+        { "from": "read-error", "to": "has-secret", "condition": "passed" },
+        { "from": "read-error", "to": "wrong-image", "condition": "failed" },
+        { "from": "read-error", "to": "wrong-image", "condition": "unknown" },
+        { "from": "has-secret", "to": "secret-content", "condition": "passed" },
+        { "from": "has-secret", "to": "no-secret-attached", "condition": "failed" },
+        { "from": "has-secret", "to": "no-secret-attached", "condition": "unknown" },
+        { "from": "secret-content", "to": "stale-token", "condition": "passed" },
+        { "from": "secret-content", "to": "wrong-secret", "condition": "failed" },
+        { "from": "secret-content", "to": "wrong-secret", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/", "title": "Pull an Image from a Private Registry", "type": "official_docs", "publisher": "Kubernetes" }
+      ]
+    },
+    {
+      "slug": "k8s-failedscheduling-insufficient-cpu",
+      "problemTitle": "Pods Pending with FailedScheduling and Insufficient cpu",
+      "problemSummary": "Pods stay Pending and kubectl describe pod's Events report FailedScheduling with a message like '0/6 nodes are available: 6 Insufficient cpu' — a capacity/fit problem rather than a config error, common right after a cluster or node-pool upgrade when nodes are being cordoned and replaced in batches.",
+      "title": "Diagnosing FailedScheduling / Insufficient cpu",
+      "summary": "Separates a transient shortfall from nodes still rejoining after an upgrade, genuine cluster-wide CPU contention needing more capacity, and a pod whose CPU request is simply too large to fit on any node in the pool at all. It does not cover FailedScheduling caused by node affinity, taints/tolerations, or Insufficient memory/pods — the same describe-pod approach applies, but the resource name in the message and the fix differ.",
+      "symptoms": [
+        "kubectl get pods shows pods stuck in Pending",
+        "kubectl describe pod Events show FailedScheduling: '0/6 nodes are available: 6 Insufficient cpu.'",
+        "Started shortly after a cluster or node-pool version upgrade"
+      ],
+      "signatures": [
+        { "errorCode": "FailedScheduling", "normalisedMessage": "0/6 nodes are available: 6 insufficient cpu.", "languageHint": null, "runtimeHint": "kubernetes" }
+      ],
+      "technologies": ["kubernetes", "kubectl"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Pods Pending with FailedScheduling / Insufficient cpu", "body": "This is a capacity-fit problem: the sum of already-scheduled CPU requests plus this pod's request exceeds what any single node currently has free. It's common right after a cluster or node-pool upgrade because upgrades typically cordon and replace nodes in batches, temporarily shrinking available capacity." },
+        { "id": "confirm-msg", "type": "test", "title": "Confirm the message actually names Insufficient cpu", "body": "Read the FailedScheduling event text precisely — the same mechanism applies to memory, taints, or affinity, but the fix is different for each.", "command": "kubectl describe pod <pod-name> -n <namespace>", "commandLanguage": "sh", "expectedOutput": "Warning  FailedScheduling  12s (x8 over 4m)  default-scheduler  0/6 nodes are available: 6 Insufficient cpu.", "safetyLevel": "informational" },
+        { "id": "wrong-resource", "type": "terminal", "title": "This is a different scheduling failure", "body": "If the message names a different resource (Insufficient memory, Insufficient pods) or mentions node affinity/taints instead, the diagnosis approach here still applies (check what the scheduler is actually comparing) but the specific fix does not — resize or reconfigure the resource actually named in the message." },
+        { "id": "node-status", "type": "test", "title": "Check whether nodes are still catching up from the upgrade", "body": "Look for NotReady nodes, nodes marked SchedulingDisabled (cordoned), or nodes that were only just created and haven't finished joining.", "command": "kubectl get nodes -o wide", "commandLanguage": "sh", "expectedOutput": "NAME       STATUS                     ROLES    AGE   VERSION\nnode-3     Ready,SchedulingDisabled   <none>   400d  v1.33.0\nnode-4     Ready                      <none>   2m    v1.33.0", "safetyLevel": "informational" },
+        { "id": "upgrade-rollout", "type": "root_cause", "title": "Root cause: capacity is temporarily down while nodes rejoin", "body": "Some nodes are cordoned or NotReady, or were only just created — this is the node rollout that usually accompanies a cluster or node-pool version upgrade. Capacity should recover once the rollout finishes; if using a managed node pool or cluster autoscaler, confirm it isn't itself stuck (quota limits, a node template that fails to boot) before assuming it will resolve on its own." },
+        { "id": "fit-check", "type": "test", "title": "Compare the pod's CPU request against the largest node's allocatable CPU", "body": "All nodes are Ready and none are cordoned — the question now is whether the pod could fit anywhere at all, or whether it's simply contention for space that does exist.", "command": "kubectl describe node <node-name> | grep -A5 Allocatable; kubectl get pod <pod-name> -n <namespace> -o jsonpath='{.spec.containers[*].resources.requests.cpu}'", "commandLanguage": "sh", "expectedOutput": "Allocatable:\n  cpu:                3800m\n  memory:             14Gi\n2000m", "safetyLevel": "informational" },
+        { "id": "contention", "type": "root_cause", "title": "Root cause: legitimate contention — the cluster needs more schedulable CPU", "body": "The pod's request does fit under some node's allocatable CPU, so this is contention rather than an impossible fit: the cluster is at capacity for schedulable CPU right now. Check that the cluster autoscaler (or manual node pool scaling) is enabled, has headroom against any cloud-provider quota, and is actually configured to add the node type this workload needs." },
+        { "id": "oversized-request", "type": "fix", "title": "Fix: the pod's CPU request doesn't fit on any node in the pool", "body": "If the pod's CPU request exceeds the allocatable CPU of every node type available, no amount of autoscaling fixes it — the scheduler will never find room. Reduce the request to something a real node can satisfy, or move the workload to a larger node pool/instance type.", "command": "kubectl set resources deployment/<deployment-name> -c=<container-name> --requests=cpu=500m -n <namespace>", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Patches the deployment's pod template with the new CPU request, which triggers a rolling restart of the deployment's pods." }
+      ],
+      "edges": [
+        { "from": "start", "to": "confirm-msg", "condition": "passed" },
+        { "from": "confirm-msg", "to": "node-status", "condition": "passed" },
+        { "from": "confirm-msg", "to": "wrong-resource", "condition": "failed" },
+        { "from": "confirm-msg", "to": "wrong-resource", "condition": "unknown" },
+        { "from": "node-status", "to": "upgrade-rollout", "condition": "passed" },
+        { "from": "node-status", "to": "fit-check", "condition": "failed" },
+        { "from": "node-status", "to": "fit-check", "condition": "unknown" },
+        { "from": "fit-check", "to": "contention", "condition": "passed" },
+        { "from": "fit-check", "to": "oversized-request", "condition": "failed" },
+        { "from": "fit-check", "to": "oversized-request", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/", "title": "Resource Management for Pods and Containers", "type": "official_docs", "publisher": "Kubernetes" }
+      ]
+    },
+    {
+      "slug": "kubectl-unknown-resource-type-crd-not-installed",
+      "problemTitle": "kubectl: the server doesn't have a resource type",
+      "problemSummary": "kubectl refuses to operate on a resource type with 'error: the server doesn't have a resource type \"X\"'. It is tempting to blame kubectl/server version skew, but Kubernetes' supported skew window does not make a resource type disappear — the real cause is almost always that the API server kubectl is actually talking to genuinely doesn't have that resource registered, most often a wrong context or a CustomResourceDefinition that was never applied.",
+      "title": "Fixing kubectl 'the server doesn't have a resource type'",
+      "summary": "Rules out the wrong-cluster case first, then checks whether the resource is a CRD that was never applied, isn't yet Established, or is being hidden from discovery by RBAC or a broken aggregated API. It does not cover ordinary typos in a resource name that IS registered — kubectl's own suggestion output usually catches those — and it is not a guide to writing CRDs.",
+      "symptoms": [
+        "kubectl get/apply fails with: error: the server doesn't have a resource type \"<name>\"",
+        "The resource works fine against a different cluster or context",
+        "Started after switching kubeconfig contexts, or after a client/server version upgrade"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "error: the server doesn't have a resource type", "languageHint": null, "runtimeHint": "kubernetes" }
+      ],
+      "technologies": ["kubectl", "kubernetes"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "kubectl: the server doesn't have a resource type \"<name>\"", "body": "Kubernetes' supported kubectl-to-API-server version skew is +/-1 minor version and does not, on its own, make a resource type disappear — for a built-in resource this error essentially never means version skew. It means the API server kubectl is actually talking to right now doesn't have that resource type registered at all." },
+        { "id": "check-context", "type": "test", "title": "Confirm which cluster/context kubectl is actually talking to", "body": "The single most common cause of this error is simply querying the wrong cluster.", "command": "kubectl config current-context && kubectl cluster-info", "commandLanguage": "sh", "expectedOutput": "staging-cluster\nKubernetes control plane is running at https://staging-api.example.com:6443", "safetyLevel": "informational" },
+        { "id": "wrong-context", "type": "fix", "title": "Fix: switch to the intended context", "body": "If the current context points at a different cluster than intended, switch and retry before investigating anything else.", "command": "kubectl config use-context <correct-context>", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Changes kubectl's active context for all subsequent commands using this kubeconfig; it does not read or modify any credentials, only which cluster/context is currently selected." },
+        { "id": "api-resources", "type": "test", "title": "Check whether the resource is registered at all on this cluster", "body": "This lists every resource type the API server currently knows about, built-in or custom.", "command": "kubectl api-resources -o wide | grep -i <resource-name>", "commandLanguage": "sh", "expectedOutput": "(no output)", "safetyLevel": "informational" },
+        { "id": "rbac-discovery", "type": "root_cause", "title": "Root cause: RBAC or a broken aggregated API is hiding it from discovery", "body": "The resource IS listed by api-resources, yet kubectl still errors on it — this points at API discovery, not registration. Either RBAC is restricting the current identity's access to the discovery endpoints for that API group, or (for an aggregated API server, not a plain CRD) the backing APIService is unavailable. Check for APIServices reporting Available=False.", "command": "kubectl get apiservices | grep False", "commandLanguage": "sh", "expectedOutput": "v1beta1.metrics.k8s.io   metrics-server/metrics-server   False (FailedDiscoveryCheck)   3h", "safetyLevel": "informational" },
+        { "id": "check-crd", "type": "test", "title": "Check whether the CustomResourceDefinition is actually installed", "body": "The resource isn't listed at all — for anything that isn't a Kubernetes built-in, it needs its CRD applied to this cluster before it can be used, as a one-time, cluster-scoped step separate from creating instances of the resource.", "command": "kubectl get crd | grep -i <resource-plural>.<group>", "commandLanguage": "sh", "expectedOutput": "(no output)", "safetyLevel": "informational" },
+        { "id": "apply-crd", "type": "fix", "title": "Fix: apply the missing CustomResourceDefinition", "body": "No matching CRD exists on this cluster. Apply the manifest that defines it — this is separate from, and must happen before, creating any actual custom resource of that type.", "command": "kubectl apply -f <crd-manifest>.yaml", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Registers the CustomResourceDefinition cluster-wide, making the resource type available in every namespace; existing custom resource objects elsewhere are unaffected, but any controller expected to own this CRD needs to already be compatible with its schema." },
+        { "id": "not-established", "type": "root_cause", "title": "Root cause: the CRD exists but isn't Established, or its scope doesn't match", "body": "The CRD is present but the resource still doesn't show in api-resources. Check the CRD's own status — the API server only serves the resource once its Established condition is True, and there can be a brief window right after apply where it isn't yet. Also check whether the CRD is Namespaced or Cluster scoped and whether it's being queried the wrong way (a cluster-scoped resource queried with -n <namespace> can look absent).", "command": "kubectl get crd <resource-plural>.<group> -o jsonpath='{.status.conditions}'", "commandLanguage": "sh", "expectedOutput": "[{\"type\":\"Established\",\"status\":\"True\",...},{\"type\":\"NamesAccepted\",\"status\":\"True\",...}]", "safetyLevel": "informational" }
+      ],
+      "edges": [
+        { "from": "start", "to": "check-context", "condition": "passed" },
+        { "from": "check-context", "to": "api-resources", "condition": "passed" },
+        { "from": "check-context", "to": "wrong-context", "condition": "failed" },
+        { "from": "check-context", "to": "wrong-context", "condition": "unknown" },
+        { "from": "api-resources", "to": "check-crd", "condition": "passed" },
+        { "from": "api-resources", "to": "rbac-discovery", "condition": "failed" },
+        { "from": "api-resources", "to": "rbac-discovery", "condition": "unknown" },
+        { "from": "check-crd", "to": "apply-crd", "condition": "passed" },
+        { "from": "check-crd", "to": "not-established", "condition": "failed" },
+        { "from": "check-crd", "to": "not-established", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/", "title": "Extend the Kubernetes API with CustomResourceDefinitions", "type": "official_docs", "publisher": "Kubernetes" },
+        { "url": "https://kubernetes.io/releases/version-skew-policy/", "title": "Kubernetes Version Skew Policy", "type": "official_docs", "publisher": "Kubernetes" }
+      ]
+    },
+    {
+      "slug": "helm-upgrade-failed-operation-in-progress",
+      "problemTitle": "Helm upgrade stuck: another operation is in progress",
+      "problemSummary": "helm upgrade fails immediately with 'Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress' because a previous operation was interrupted (a killed CI job, a dropped connection) and left the release's stored state as pending-*, even though nothing is actually running any more.",
+      "title": "Clearing a Helm release stuck pending-upgrade / pending-install",
+      "summary": "Confirms the release really is stuck in a pending-* state with nothing genuinely in flight, then clears it — via helm rollback when a prior successful revision exists, or by removing the stuck release record when there isn't one (a first install that never completed). It does not cover a helm upgrade that is genuinely still running, or Helm 2's separate Tiller-based failure modes.",
+      "symptoms": [
+        "helm upgrade fails instantly with: Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress",
+        "helm status shows STATUS: pending-upgrade, pending-install, or pending-rollback",
+        "No CI job or teammate is actually running a Helm command against this release right now"
+      ],
+      "signatures": [
+        { "errorCode": "UPGRADE FAILED", "normalisedMessage": "error: upgrade failed: another operation (install/upgrade/rollback) is in progress", "languageHint": null, "runtimeHint": null }
+      ],
+      "technologies": ["helm", "kubectl"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Helm upgrade fails: another operation is in progress", "body": "Helm refuses to start a new operation while its stored release history says one is already in progress — even if that operation was actually killed (a CI job cancelled mid-run, a network drop) and nothing is running any more." },
+        { "id": "confirm-pending", "type": "test", "title": "Confirm the release's stored status", "body": "Check what Helm itself believes the release's status currently is.", "command": "helm status <release-name> -n <namespace>", "commandLanguage": "sh", "expectedOutput": "NAME: <release-name>\nLAST DEPLOYED: Thu Aug 20 14:02:11 2026\nNAMESPACE: <namespace>\nSTATUS: pending-upgrade\nREVISION: 4", "safetyLevel": "informational" },
+        { "id": "not-pending", "type": "terminal", "title": "This generic fix doesn't apply", "body": "If STATUS isn't one of the pending-* states, this isn't a stuck-operation problem — re-read the actual error text, it may be a genuinely concurrent Helm process or an unrelated failure." },
+        { "id": "still-running", "type": "test", "title": "Is a Helm operation actually still running right now?", "body": "Check CI history and with teammates before touching anything — running a manual fix concurrently with a real in-flight operation corrupts the release history further.", "command": "# check CI pipeline history for this release, and any Helm hook Jobs still active\nkubectl get jobs -n <namespace> -l app.kubernetes.io/managed-by=Helm", "commandLanguage": "sh", "expectedOutput": "No resources found in <namespace> namespace.", "safetyLevel": "informational" },
+        { "id": "wait", "type": "terminal", "title": "Wait for the in-flight operation to finish", "body": "Something is genuinely still running against this release. Wait for it to finish (or fail) before running anything else against it." },
+        { "id": "has-history", "type": "test", "title": "Does helm history show an earlier successful revision?", "body": "Whether a clean prior revision exists determines which recovery path applies.", "command": "helm history <release-name> -n <namespace>", "commandLanguage": "sh", "expectedOutput": "REVISION  STATUS      DESCRIPTION\n3         superseded  Upgrade complete\n4         pending-upgrade  Preparing upgrade", "safetyLevel": "informational" },
+        { "id": "rollback", "type": "fix", "title": "Fix: roll back to the last successful revision", "body": "This is the safe, supported way to clear a stuck pending-* status when a prior good revision exists.", "command": "helm rollback <release-name> <last-good-revision> -n <namespace>", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Reverts the release's live Kubernetes resources to match the specified prior revision and records a new 'deployed' revision, which clears the stuck pending-* status. It does not undo anything beyond that revision." },
+        { "id": "delete-stuck-secret", "type": "fix", "title": "Fix: remove the stuck release record for a first install with no prior revision", "body": "There's no earlier deployed revision to roll back to — typically a pending-install that never completed. Helm stores each revision's record as a Secret in the release's namespace; deleting the one for the stuck pending revision lets Helm treat the next attempt as a fresh install. This does not touch any application resources already created in the cluster, only Helm's own bookkeeping.", "command": "kubectl get secrets -n <namespace> -l \"owner=helm,name=<release-name>\"\nkubectl delete secret -n <namespace> sh.helm.release.v1.<release-name>.v<pending-revision-number>", "commandLanguage": "sh", "safetyLevel": "destructive", "safetyEffect": "Permanently deletes Helm's stored record of that one revision from the release's history (a Kubernetes Secret); Helm will then allow a fresh install/upgrade, but you lose the ability to helm rollback to that specific revision number afterward." }
+      ],
+      "edges": [
+        { "from": "start", "to": "confirm-pending", "condition": "passed" },
+        { "from": "confirm-pending", "to": "still-running", "condition": "passed" },
+        { "from": "confirm-pending", "to": "not-pending", "condition": "failed" },
+        { "from": "confirm-pending", "to": "not-pending", "condition": "unknown" },
+        { "from": "still-running", "to": "has-history", "condition": "passed" },
+        { "from": "still-running", "to": "wait", "condition": "failed" },
+        { "from": "still-running", "to": "wait", "condition": "unknown" },
+        { "from": "has-history", "to": "rollback", "condition": "passed" },
+        { "from": "has-history", "to": "delete-stuck-secret", "condition": "failed" },
+        { "from": "has-history", "to": "delete-stuck-secret", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://helm.sh/docs/helm/helm_rollback/", "title": "helm rollback", "type": "official_docs", "publisher": "Helm" },
+        { "url": "https://helm.sh/docs/helm/helm_upgrade/", "title": "helm upgrade", "type": "official_docs", "publisher": "Helm" }
+      ]
+    },
+    {
+      "slug": "coredns-servfail-loop-detected",
+      "problemTitle": "CoreDNS crashlooping with plugin/loop: Loop detected",
+      "problemSummary": "CoreDNS pods crashloop and cluster DNS returns SERVFAIL because the loop plugin has detected CoreDNS forwarding a query back to itself, most commonly because the node's /etc/resolv.conf points at a loopback DNS stub (such as systemd-resolved's 127.0.0.53) that CoreDNS was configured to forward to.",
+      "title": "Fixing CoreDNS SERVFAIL from a detected forwarding loop",
+      "summary": "Confirms the crash is genuinely the loop plugin (not an unrelated SERVFAIL cause), traces it to the node's resolv.conf in the common case, and fixes it by forwarding to explicit upstream resolvers instead. It does not cover SERVFAIL caused by an actually-unreachable upstream DNS server, NetworkPolicy blocking egress from CoreDNS, or CoreDNS being resource-starved — those don't log the loop-plugin message and need a different diagnosis.",
+      "symptoms": [
+        "CoreDNS pods in kube-system are restarting repeatedly",
+        "kubectl logs on a coredns pod shows: [FATAL] plugin/loop: Loop (127.0.0.1:...->:53) detected for zone \".\"",
+        "In-cluster DNS lookups intermittently or consistently return SERVFAIL"
+      ],
+      "signatures": [
+        { "errorCode": "SERVFAIL", "normalisedMessage": "plugin/loop: loop (127.0.0.1:...->:53) detected for zone \".\", see https://coredns.io/plugins/loop#troubleshooting", "languageHint": null, "runtimeHint": "kubernetes" }
+      ],
+      "technologies": ["coredns", "kubernetes", "kubectl"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "CoreDNS crashlooping, DNS returns SERVFAIL", "body": "CoreDNS's own loop plugin deliberately crashes it rather than serving an infinite loop — that's a safety feature, not the bug itself. The bug is whatever is making CoreDNS query itself in the first place." },
+        { "id": "confirm-loop", "type": "test", "title": "Confirm it's the loop plugin", "body": "Check the CoreDNS pod logs for the specific FATAL loop message before assuming the cause.", "command": "kubectl logs -n kube-system -l k8s-app=kube-dns --tail=20", "commandLanguage": "sh", "expectedOutput": "[FATAL] plugin/loop: Loop (127.0.0.1:52561 -> :53) detected for zone \".\", see https://coredns.io/plugins/loop#troubleshooting. Query: \"HINFO 4547991809047724227.400057319072097461.\"", "safetyLevel": "informational" },
+        { "id": "not-loop", "type": "terminal", "title": "This SERVFAIL isn't the loop-plugin kind", "body": "No FATAL loop message in the logs — treat this as a different SERVFAIL cause: upstream DNS actually unreachable, a NetworkPolicy blocking egress from CoreDNS's namespace, or CoreDNS being throttled/OOM-limited under load." },
+        { "id": "check-resolv", "type": "test", "title": "Find where the loop actually originates: the node's resolv.conf", "body": "The most common source is the node's own /etc/resolv.conf, which kubelet copies into the CoreDNS Corefile's default upstream (forward . /etc/resolv.conf). If it contains a loopback stub such as 127.0.0.53 (systemd-resolved), CoreDNS ends up forwarding to itself indirectly through that stub.", "command": "cat /etc/resolv.conf", "commandLanguage": "sh", "expectedOutput": "nameserver 127.0.0.53\noptions edns0 trust-ad\nsearch example.internal", "safetyLevel": "informational" },
+        { "id": "other-cause", "type": "root_cause", "title": "Root cause: the loop originates somewhere other than the node's resolv.conf", "body": "resolv.conf on the node doesn't show a loopback address, so the self-reference is coming from elsewhere — most often a custom Corefile forward target that itself resolves back to CoreDNS's own ClusterIP. Compare the Corefile's forward line against the kube-dns Service's ClusterIP; if they point at each other, that's the loop, and it needs to be traced by hand rather than fixed with the resolv.conf workaround below.", "command": "kubectl get configmap coredns -n kube-system -o yaml | grep forward", "commandLanguage": "sh", "expectedOutput": "    forward . 10.96.0.10", "safetyLevel": "informational" },
+        { "id": "fix-corefile", "type": "fix", "title": "Fix: forward to explicit upstream resolvers instead of the node's resolv.conf", "body": "Replace `forward . /etc/resolv.conf` in the CoreDNS Corefile with explicit, known-good upstream resolvers so CoreDNS stops depending on whatever loopback stub the node happens to have configured, then restart CoreDNS to pick up the change. The alternative fix — pointing kubelet's --resolv-conf flag at /run/systemd/resolve/resolv.conf, which has the real upstream servers rather than the stub — requires node-level access and a kubelet restart, so this Corefile edit is the lower-risk, cluster-only option.", "command": "kubectl edit configmap coredns -n kube-system\n# change: forward . /etc/resolv.conf\n# to:     forward . 1.1.1.1 8.8.8.8\nkubectl rollout restart deployment coredns -n kube-system", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Changes what upstream DNS servers every CoreDNS pod forwards unresolved queries to, and restarts every CoreDNS pod to pick up the change; there is a brief window of reduced DNS capacity during the rollout." },
+        { "id": "verify-dns", "type": "verification", "title": "Confirm DNS resolves again", "body": "Run a lookup from inside the cluster to confirm CoreDNS is answering normally.", "command": "kubectl run -it --rm dnstest --image=busybox:1.36 --restart=Never -- nslookup kubernetes.default", "commandLanguage": "sh", "expectedOutput": "Server:    10.96.0.10\nAddress:   10.96.0.10:53\n\nName:      kubernetes.default.svc.cluster.local\nAddress:   10.96.0.1", "safetyLevel": "informational" },
+        { "id": "resolved", "type": "terminal", "title": "DNS restored", "body": "Lookups succeed and CoreDNS pods are no longer restarting. Nothing further to do." }
+      ],
+      "edges": [
+        { "from": "start", "to": "confirm-loop", "condition": "passed" },
+        { "from": "confirm-loop", "to": "check-resolv", "condition": "passed" },
+        { "from": "confirm-loop", "to": "not-loop", "condition": "failed" },
+        { "from": "confirm-loop", "to": "not-loop", "condition": "unknown" },
+        { "from": "check-resolv", "to": "fix-corefile", "condition": "passed" },
+        { "from": "check-resolv", "to": "other-cause", "condition": "failed" },
+        { "from": "check-resolv", "to": "other-cause", "condition": "unknown" },
+        { "from": "fix-corefile", "to": "verify-dns", "condition": "passed" },
+        { "from": "verify-dns", "to": "resolved", "condition": "passed" },
+        { "from": "verify-dns", "to": "other-cause", "condition": "failed" },
+        { "from": "verify-dns", "to": "other-cause", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://coredns.io/plugins/loop/", "title": "loop", "type": "official_docs", "publisher": "CoreDNS" },
+        { "url": "https://kubernetes.io/docs/tasks/administer-cluster/dns-debugging-resolution/", "title": "Debugging DNS Resolution", "type": "official_docs", "publisher": "Kubernetes" }
+      ]
+    },
+    {
+      "slug": "nginx-ingress-504-gateway-timeout",
+      "problemTitle": "Ingress returns 504 Gateway Time-out under load",
+      "problemSummary": "Clients see 504 Gateway Time-out from the NGINX Ingress Controller, which happens either because the backend genuinely doesn't respond within nginx's configured proxy-read-timeout, or because nginx has no live, ready backend to send the request to at all — two distinct causes with different fixes.",
+      "title": "Diagnosing ingress-nginx 504 Gateway Time-out",
+      "summary": "Splits 504s into a slow-backend branch (raise the per-Ingress timeout for a legitimately slow endpoint, or fix backend contention if it's overload-shaped) and a no-live-upstream branch (no Ready endpoints, or a Service/NetworkPolicy blocking traffic to an otherwise-healthy pod). It does not cover 502/503 responses, which usually mean the backend actively refused or reset the connection rather than never answering, or client-side timeouts that never reach the ingress at all.",
+      "symptoms": [
+        "Clients intermittently or consistently receive HTTP 504 from the ingress, especially under traffic spikes",
+        "ingress-controller error log shows: upstream timed out (110: Connection timed out) while reading response header from upstream",
+        "ingress-controller error log instead shows: no live upstreams"
+      ],
+      "signatures": [
+        { "errorCode": "504", "normalisedMessage": "upstream timed out (110: connection timed out) while reading response header from upstream", "languageHint": null, "runtimeHint": "kubernetes" },
+        { "errorCode": "504", "normalisedMessage": "no live upstreams", "languageHint": null, "runtimeHint": "kubernetes" }
+      ],
+      "technologies": ["nginx-ingress-controller", "kubernetes", "kubectl"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Ingress returns 504 Gateway Time-out under load", "body": "504 from ingress-nginx means nginx itself gave up waiting for (or never found) a working backend — it's not the backend actively returning an error. The exact log message splits this into two genuinely different causes." },
+        { "id": "check-log", "type": "test", "title": "Check the ingress-controller's error log for the exact upstream message", "body": "'upstream timed out' means nginx reached a backend but it didn't answer in time. 'no live upstreams' (or connection-refused style messages) means nginx had nothing ready to send the request to at all.", "command": "kubectl logs -n ingress-nginx <ingress-controller-pod> --tail=200 | grep -i 'upstream timed out\\|no live upstreams'", "commandLanguage": "sh", "expectedOutput": "2026-08-05T18:44:02+00:00 [error] 34#34: *8821 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 10.2.1.4, server: api.internal, request: \"POST /v1/orders HTTP/1.1\", upstream: \"http://10.2.3.9:8080/v1/orders\"", "safetyLevel": "informational" },
+        { "id": "is-legit-slow", "type": "test", "title": "Is the backend genuinely slow, or is nginx's timeout just too low for it?", "body": "Compare the backend's real response time for this endpoint (bypassing the ingress) against the configured proxy-read-timeout, which defaults to 60 seconds.", "command": "kubectl exec -n <namespace> <debug-pod> -- curl -w '%{time_total}\\n' -o /dev/null -s http://<backend-service>.<namespace>.svc.cluster.local:<port>/<path>", "commandLanguage": "sh", "expectedOutput": "63.912000", "safetyLevel": "informational" },
+        { "id": "raise-timeout", "type": "fix", "title": "Fix: raise this Ingress's proxy-read/send-timeout", "body": "The endpoint is legitimately slower than nginx's default 60-second timeout for reasons that are expected (a report-generation endpoint, for example). Raise the timeout on this specific Ingress rather than cluster-wide, so a genuinely hung backend elsewhere still fails visibly.", "command": "kubectl annotate ingress <ingress-name> -n <namespace> nginx.ingress.kubernetes.io/proxy-read-timeout=120 nginx.ingress.kubernetes.io/proxy-send-timeout=120 --overwrite", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Changes how long this specific Ingress's nginx location block waits for the backend before returning 504. ingress-nginx hot-reloads its configuration, so this takes effect within seconds without restarting the controller pod." },
+        { "id": "backend-overload", "type": "root_cause", "title": "Root cause: backend contention under load, not a timeout setting", "body": "The backend responds quickly outside the load spike, so the slowness only appears under concurrent load — this is capacity or contention (thread pool exhaustion, a database connection pool maxing out, insufficient replicas). Raising the ingress timeout just makes clients wait longer for the same overload; the fix is scaling the backend or fixing whatever it blocks on under load, which is outside ingress-nginx's control." },
+        { "id": "check-endpoints", "type": "test", "title": "Are the backend pods actually Ready?", "body": "'no live upstreams' means the Service behind this Ingress currently has no Ready endpoints for nginx to send traffic to.", "command": "kubectl get endpoints <service-name> -n <namespace>", "commandLanguage": "sh", "expectedOutput": "NAME              ENDPOINTS   AGE\n<service-name>    <none>      41d", "safetyLevel": "informational" },
+        { "id": "no-endpoints", "type": "root_cause", "title": "Root cause: the Service has no Ready backend pods", "body": "ENDPOINTS is empty — nginx genuinely has nothing to proxy to. Check the Deployment's readiness probe (failing readiness keeps a pod out of Endpoints even while Running), a label selector mismatch between the Service and the pods, or the Deployment being scaled to zero." },
+        { "id": "network-mismatch", "type": "root_cause", "title": "Root cause: endpoints exist but traffic can't reach them", "body": "Endpoints ARE populated and the pods look Ready, yet nginx still can't get a response — check for a Service/Ingress backend port mismatch, or a NetworkPolicy blocking traffic from the ingress-controller's namespace to the backend's namespace. Kubernetes considers the pod healthy from a readiness-probe standpoint even though packets from the ingress controller specifically never arrive." }
+      ],
+      "edges": [
+        { "from": "start", "to": "check-log", "condition": "passed" },
+        { "from": "check-log", "to": "is-legit-slow", "condition": "passed" },
+        { "from": "check-log", "to": "check-endpoints", "condition": "failed" },
+        { "from": "check-log", "to": "check-endpoints", "condition": "unknown" },
+        { "from": "is-legit-slow", "to": "raise-timeout", "condition": "passed" },
+        { "from": "is-legit-slow", "to": "backend-overload", "condition": "failed" },
+        { "from": "is-legit-slow", "to": "backend-overload", "condition": "unknown" },
+        { "from": "check-endpoints", "to": "no-endpoints", "condition": "passed" },
+        { "from": "check-endpoints", "to": "network-mismatch", "condition": "failed" },
+        { "from": "check-endpoints", "to": "network-mismatch", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/", "title": "Annotations", "type": "official_docs", "publisher": "ingress-nginx" }
+      ]
+    },
+    {
+      "slug": "containerd-task-creation-failed-context-deadline",
+      "problemTitle": "kubelet reports failed to create containerd task: context deadline exceeded",
+      "problemSummary": "Pods fail to start with containerd logging 'failed to create containerd task' and 'context deadline exceeded' — containerd isn't finishing container creation within the CRI's deadline, most often because the node itself is starved (disk I/O especially, since overlay/snapshot setup is disk-heavy) or containerd's own state has grown large enough to slow every operation down.",
+      "title": "Diagnosing containerd task-creation timeouts",
+      "summary": "Narrows a context-deadline-exceeded failure to node-level resource pressure versus containerd being slowed by a large pile-up of stale containers/images on one node. It does not cover a genuinely crashed containerd daemon (a different, more obvious failure mode) or CNI-level sandbox failures that don't mention containerd task creation specifically.",
+      "symptoms": [
+        "Pods stuck in ContainerCreating or repeatedly failing to start",
+        "containerd/kubelet logs show: failed to create containerd task, error=\"context deadline exceeded\"",
+        "Logs also show: RunPodSandbox from runtime service failed ... code = DeadlineExceeded"
+      ],
+      "signatures": [
+        { "errorCode": "DeadlineExceeded", "normalisedMessage": "failed to create containerd task, error=\"context deadline exceeded\"", "languageHint": null, "runtimeHint": "containerd" }
+      ],
+      "technologies": ["containerd", "kubernetes", "kubectl"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "containerd task creation is timing out", "body": "This deadline is a CRI-level timeout, not an application error — something is slowing down containerd's own container-creation path on the affected node(s)." },
+        { "id": "scope", "type": "test", "title": "Is this happening on one node or across the cluster?", "body": "Check which node(s) the failing pods actually land on before diagnosing a specific machine.", "command": "kubectl get events -A --field-selector reason=FailedCreatePodSandBox -o wide", "commandLanguage": "sh", "expectedOutput": "NAMESPACE   OBJECT       REASON                    NODE\ndefault     pod/app-7f  FailedCreatePodSandBox    node-8", "safetyLevel": "informational" },
+        { "id": "cluster-wide", "type": "root_cause", "title": "Root cause: likely a cluster-wide containerd/CRI or network issue", "body": "This is happening broadly across most or all nodes, not one sick machine — that points at something affecting every node identically: a containerd/CRI version mismatch after an upgrade, a shared registry/network path every node depends on, or a cluster-wide config change. This needs a broader investigation than a single node's resource state." },
+        { "id": "node-health", "type": "test", "title": "Check the affected node's resource pressure and containerd's own health", "body": "Look for DiskPressure, MemoryPressure or PIDPressure on the node, and whether the containerd service itself is degraded.", "command": "kubectl describe node <node-name> | grep -A5 Conditions", "commandLanguage": "sh", "expectedOutput": "Conditions:\n  Type             Status\n  DiskPressure     True\n  MemoryPressure   False\n  PIDPressure      False\n  Ready            True", "safetyLevel": "informational" },
+        { "id": "resource-exhaustion", "type": "root_cause", "title": "Root cause: the node is resource-starved, usually on disk", "body": "The node shows DiskPressure, MemoryPressure or PIDPressure True, or containerd's own service is degraded/restarting — containerd can't finish creating a task within the CRI deadline because the node itself is starved. Overlay/snapshot setup is disk-heavy, so disk contention is the most common of the three. Find what's actually consuming the disk before deciding whether to free space, move pods off the node, or add capacity.", "command": "df -h", "commandLanguage": "sh", "expectedOutput": "Filesystem      Size  Used Avail Use% Mounted on\n/dev/sda1       97G   95G  1.2G  99% /var/lib/containerd", "safetyLevel": "informational" },
+        { "id": "pileup-check", "type": "test", "title": "Is there a large pile-up of stale containers or images on this node?", "body": "A very large number of stopped containers or dangling images is a known way to slow every containerd operation, including task creation, because containerd has to walk more state on each call.", "command": "crictl ps -a | wc -l && crictl images | wc -l", "commandLanguage": "sh", "expectedOutput": "3812\n214", "safetyLevel": "informational" },
+        { "id": "prune-fix", "type": "fix", "title": "Fix: remove the stale exited containers", "body": "An unusually large exited-container count is slowing containerd down. Prune them on this specific node.", "command": "crictl rm $(crictl ps -a -q --state Exited)", "commandLanguage": "sh", "safetyLevel": "destructive", "safetyEffect": "Permanently removes every exited container tracked by containerd on this node, freeing the state containerd scans on each operation. It only affects Exited containers, not Running ones, but you lose their logs and exit codes once removed." },
+        { "id": "unclear-containerd", "type": "terminal", "title": "Node and containerd both look healthy", "body": "Resource conditions are clear and there's no unusual pile-up — this needs a lower-level trace (containerd/runc debug logs, or checking for a known runtime bug matching your containerd version) beyond a generic checklist." }
+      ],
+      "edges": [
+        { "from": "start", "to": "scope", "condition": "passed" },
+        { "from": "scope", "to": "node-health", "condition": "passed" },
+        { "from": "scope", "to": "cluster-wide", "condition": "failed" },
+        { "from": "scope", "to": "node-health", "condition": "unknown" },
+        { "from": "node-health", "to": "resource-exhaustion", "condition": "passed" },
+        { "from": "node-health", "to": "pileup-check", "condition": "failed" },
+        { "from": "node-health", "to": "pileup-check", "condition": "unknown" },
+        { "from": "pileup-check", "to": "prune-fix", "condition": "passed" },
+        { "from": "pileup-check", "to": "unclear-containerd", "condition": "failed" },
+        { "from": "pileup-check", "to": "unclear-containerd", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://kubernetes.io/docs/tasks/debug/debug-cluster/crictl/", "title": "Debugging Kubernetes nodes with crictl", "type": "official_docs", "publisher": "Kubernetes" }
+      ]
+    },
+    {
+      "slug": "docker-cannot-connect-daemon",
+      "problemTitle": "docker: Cannot connect to the Docker daemon",
+      "problemSummary": "Every docker command fails with 'Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?' — the daemon isn't reachable at that socket, which can mean it's genuinely not running, the CLI is pointed at the wrong endpoint via DOCKER_HOST or a Docker context, or (a related but differently-worded problem) the current user lacks permission on the socket.",
+      "title": "Fixing 'Cannot connect to the Docker daemon'",
+      "summary": "Checks whether the daemon is actually running, then whether DOCKER_HOST or the active Docker context is pointing somewhere unexpected. It also flags the socket-permission lookalike ('Got permission denied' rather than 'Cannot connect') as a distinct message with a distinct fix, so it isn't mistaken for a dead daemon.",
+      "symptoms": [
+        "Every docker command fails immediately with the same connection error",
+        "Daemon log or CLI shows: Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?",
+        "Works fine after restarting the machine or Docker Desktop, then recurs"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "cannot connect to the docker daemon at unix:///var/run/docker.sock. is the docker daemon running?", "languageHint": null, "runtimeHint": null }
+      ],
+      "technologies": ["docker"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "docker: Cannot connect to the Docker daemon", "body": "This message means the CLI couldn't reach a daemon at all via the socket it tried — it's distinct from a 'permission denied' error on the same socket, which means it reached the socket but was refused access." },
+        { "id": "daemon-running", "type": "test", "title": "Is the daemon process actually running?", "body": "Check the daemon's own service status before assuming it's a client-side configuration problem.", "command": "systemctl status docker", "commandLanguage": "sh", "expectedOutput": "docker.service - Docker Application Container Engine\n     Loaded: loaded (/lib/systemd/system/docker.service; enabled)\n     Active: inactive (dead) since Thu 2026-08-20 09:12:03 UTC; 4min ago", "safetyLevel": "informational" },
+        { "id": "start-daemon", "type": "fix", "title": "Fix: start the daemon", "body": "The daemon isn't running. If it was crash-looping rather than simply stopped, check journalctl -u docker for why before assuming this alone fixes it.", "command": "sudo systemctl start docker", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Starts the Docker daemon service on this machine." },
+        { "id": "docker-host", "type": "test", "title": "Is DOCKER_HOST pointing somewhere unexpected?", "body": "The daemon is running, so check whether the CLI is being told to talk to a different (possibly stale or remote) endpoint instead of the local socket.", "command": "echo $DOCKER_HOST", "commandLanguage": "sh", "expectedOutput": "tcp://old-build-host:2375", "safetyLevel": "informational" },
+        { "id": "unset-host", "type": "fix", "title": "Fix: unset DOCKER_HOST", "body": "A stale or incorrect DOCKER_HOST is overriding the default local socket.", "command": "unset DOCKER_HOST", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Removes the DOCKER_HOST override for the current shell session only; future docker invocations in this terminal use the default local socket instead." },
+        { "id": "check-context", "type": "test", "title": "Is the active Docker context pointing at a stale endpoint?", "body": "DOCKER_HOST isn't the issue — check docker context ls for the currently selected context and where it points, which can be left over from a remote/rootless setup or a Docker Desktop reinstall.", "command": "docker context ls", "commandLanguage": "sh", "expectedOutput": "NAME       DESCRIPTION       DOCKER ENDPOINT\ndefault    Current context   unix:///var/run/docker.sock\nremote-vm *                  ssh://build@old-vm", "safetyLevel": "informational" },
+        { "id": "switch-context", "type": "fix", "title": "Fix: switch back to the default context", "body": "The active context is pointed at an endpoint that no longer exists or isn't reachable.", "command": "docker context use default", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Switches the Docker CLI's active context back to 'default' for this user; it does not affect the daemon itself, only which endpoint the CLI talks to." },
+        { "id": "permissions-note", "type": "terminal", "title": "Socket and context are both fine — check permissions instead", "body": "If the error text actually reads 'permission denied' rather than 'cannot connect' — a distinct message on the same socket — the user running docker isn't in the docker group (sudo usermod -aG docker $USER, then log out and back in) rather than the daemon being unreachable. If it's truly the same 'cannot connect' wording, try sudo docker version: if that works, it confirms a permissions problem rather than a dead daemon, despite the wording." }
+      ],
+      "edges": [
+        { "from": "start", "to": "daemon-running", "condition": "passed" },
+        { "from": "daemon-running", "to": "docker-host", "condition": "passed" },
+        { "from": "daemon-running", "to": "start-daemon", "condition": "failed" },
+        { "from": "daemon-running", "to": "start-daemon", "condition": "unknown" },
+        { "from": "docker-host", "to": "unset-host", "condition": "passed" },
+        { "from": "docker-host", "to": "check-context", "condition": "failed" },
+        { "from": "docker-host", "to": "check-context", "condition": "unknown" },
+        { "from": "check-context", "to": "switch-context", "condition": "passed" },
+        { "from": "check-context", "to": "permissions-note", "condition": "failed" },
+        { "from": "check-context", "to": "permissions-note", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://docs.docker.com/engine/install/linux-postinstall/", "title": "Linux post-installation steps for Docker Engine", "type": "official_docs", "publisher": "Docker" }
+      ]
+    },
+    {
+      "slug": "docker-exec-format-error-arch-mismatch",
+      "problemTitle": "Container fails with exec format error",
+      "problemSummary": "A container fails immediately with 'exec user process caused: exec format error', which means the kernel was asked to execute a binary it can't run — almost always a CPU architecture mismatch between where the image was built and where it's running, but occasionally a script with a missing or corrupted shebang line instead.",
+      "title": "Fixing 'exec format error' in a container",
+      "summary": "Checks the image's recorded architecture against the host's before assuming a CPU mismatch, fixes it with a multi-arch build, and verifies. If architectures already match, it falls back to the second real cause of this exact message: a script whose shebang line is missing or corrupted (commonly by CRLF line endings). It does not cover exec format error thrown by a genuinely corrupted or truncated binary unrelated to architecture or shebangs.",
+      "symptoms": [
+        "Container exits immediately with: standard_init_linux.go: exec user process caused: exec format error",
+        "Image runs fine on the machine it was built on but fails elsewhere",
+        "Started after moving the same image to a different CPU architecture (Intel vs Apple Silicon, x86_64 vs arm64/aarch64)"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "standard_init_linux.go: exec user process caused: exec format error", "languageHint": null, "runtimeHint": null }
+      ],
+      "technologies": ["docker", "docker-buildx"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Container fails with exec format error", "body": "This is the kernel refusing to execute a binary it doesn't understand — usually because the binary was compiled for a different CPU architecture than the host it's running on." },
+        { "id": "check-arch", "type": "test", "title": "Check the image's architecture against the host's", "body": "Compare what architecture the image was built for against the architecture of the host that's failing.", "command": "docker image inspect <image>:<tag> --format '{{.Architecture}}'\nuname -m", "commandLanguage": "sh", "expectedOutput": "amd64\naarch64", "safetyLevel": "informational" },
+        { "id": "arch-mismatch", "type": "fix", "title": "Fix: build a multi-architecture image", "body": "The image's architecture doesn't match the host's — rebuild for the architectures you actually deploy to instead of relying on the builder host's default.", "command": "docker buildx build --platform linux/amd64,linux/arm64 -t <image>:<tag> --push .", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Builds and pushes a new multi-architecture manifest for this tag to the registry. Anything already running from the old single-arch tag is unaffected until it's redeployed, but new pulls of this tag now resolve to the matching architecture automatically." },
+        { "id": "verify-arch-fix", "type": "verification", "title": "Confirm the image now runs on the target host", "body": "Run the image on the previously-failing host (or have it redeployed there) to confirm the fix actually resolved it.", "command": "docker run --rm <image>:<tag> <command>", "commandLanguage": "sh", "expectedOutput": "(container starts and runs normally)", "safetyLevel": "informational" },
+        { "id": "resolved", "type": "terminal", "title": "Resolved", "body": "The container now runs correctly on the target architecture." },
+        { "id": "check-shebang", "type": "test", "title": "Is the thing actually failing a script rather than a compiled binary?", "body": "Architectures already match, so check whether the entrypoint is an interpreted script with a missing or corrupted shebang line — the kernel returns exactly the same exec format error when it tries to exec a script directly instead of handing it to an interpreter. A common cause is CRLF line endings: a stray \\r right after #!/bin/sh corrupts the interpreter path.", "command": "docker run --rm --entrypoint sh <image>:<tag> -c \"head -c 100 /path/to/script | cat -A\"", "commandLanguage": "sh", "expectedOutput": "#!/bin/sh^M$\necho \"starting\"^M$", "safetyLevel": "informational" },
+        { "id": "shebang-issue", "type": "root_cause", "title": "Root cause: missing or corrupted shebang line", "body": "The ^M markers are carriage returns from CRLF line endings, most often introduced by editing the script on Windows or a misconfigured git autocrlf setting. Ensure the file starts with a valid shebang (#!/bin/sh or #!/usr/bin/env bash) and has Unix (LF) line endings — dos2unix <script>, or a .gitattributes entry marking the file text eol=lf, fixes it." },
+        { "id": "unclear-exec", "type": "terminal", "title": "Neither architecture nor shebang explains it", "body": "Architecture matches and the entrypoint's shebang looks fine — check the full error line for the exact path the kernel tried to exec, and confirm that file actually has the executable bit set (chmod +x) inside the image." }
+      ],
+      "edges": [
+        { "from": "start", "to": "check-arch", "condition": "passed" },
+        { "from": "check-arch", "to": "arch-mismatch", "condition": "passed" },
+        { "from": "check-arch", "to": "check-shebang", "condition": "failed" },
+        { "from": "check-arch", "to": "check-shebang", "condition": "unknown" },
+        { "from": "arch-mismatch", "to": "verify-arch-fix", "condition": "passed" },
+        { "from": "verify-arch-fix", "to": "resolved", "condition": "passed" },
+        { "from": "verify-arch-fix", "to": "check-shebang", "condition": "failed" },
+        { "from": "verify-arch-fix", "to": "check-shebang", "condition": "unknown" },
+        { "from": "check-shebang", "to": "shebang-issue", "condition": "passed" },
+        { "from": "check-shebang", "to": "unclear-exec", "condition": "failed" },
+        { "from": "check-shebang", "to": "unclear-exec", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://docs.docker.com/build/building/multi-platform/", "title": "Multi-platform builds", "type": "official_docs", "publisher": "Docker" }
+      ]
+    },
+    {
+      "slug": "node-econnrefused-service-unavailable",
+      "problemTitle": "Node process throws ECONNREFUSED",
+      "problemSummary": "A Node.js process throws ECONNREFUSED connecting to some host:port, meaning the connection reached the target host and was actively rejected — nothing is listening there. That's distinct from a timeout, which usually means the packet never got a response at all (a network path/firewall issue), so it narrows the cause to the target genuinely not listening, a wrong host/port, or a startup-order race.",
+      "title": "Diagnosing Node.js ECONNREFUSED",
+      "summary": "Confirms nothing is actually listening at the target address, then splits between a host/port misconfiguration (wrong address for where the dependency actually lives) and a startup-order race (the app connects before its dependency is ready). It does not cover connection timeouts (ETIMEDOUT), which point at network reachability rather than an actively refused connection, and it isn't specific to any one dependency — the same triage applies whether the target is a database, cache, or another service.",
+      "symptoms": [
+        "Node process crashes or logs an unhandled error containing ECONNREFUSED",
+        "Error includes a specific host:port, e.g. ECONNREFUSED 127.0.0.1:5432",
+        "Happens reliably right after deploy or container start, or intermittently under restarts"
+      ],
+      "signatures": [
+        { "errorCode": "ECONNREFUSED", "normalisedMessage": "econnrefused 127.0.0.1:5432", "languageHint": "javascript", "runtimeHint": "node" },
+        { "errorCode": "ECONNREFUSED", "normalisedMessage": "connect econnrefused", "languageHint": "javascript", "runtimeHint": "node" }
+      ],
+      "technologies": ["nodejs"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Node process throws ECONNREFUSED", "body": "ECONNREFUSED means the TCP handshake reached the target host and was actively rejected (an RST) — nothing is listening on that exact port there right now. This narrows the cause to three things: nothing's listening yet, the app is connecting to the wrong host/port, or the thing that should be listening crashed." },
+        { "id": "check-listening", "type": "test", "title": "Is anything currently listening at that exact host and port?", "body": "Check on the target host itself (locally, in the container, or via the orchestrator) whether the address the error names is actually bound by anything right now.", "command": "ss -ltnp | grep <port>", "commandLanguage": "sh", "expectedOutput": "(no output)", "safetyLevel": "informational" },
+        { "id": "still-listening", "type": "terminal", "title": "Something is listening there right now", "body": "A plain ECONNREFUSED shouldn't be reproducible any more if something is actively listening at that address. This was probably transient — the service was mid-restart at the exact moment of connection — or the error being chased is stale. Re-run the failing call and see if it recurs." },
+        { "id": "config-mismatch", "type": "test", "title": "Does the app's configured address actually match where the dependency lives?", "body": "Print the resolved connection config the process is actually using and compare it against where the dependency really runs — a classic mismatch is a config pointing at localhost/127.0.0.1 when the dependency is actually a separate container or pod reachable only by its own service name.", "command": "node -e \"console.log(process.env.DATABASE_URL)\"", "commandLanguage": "sh", "expectedOutput": "postgres://app:***@127.0.0.1:5432/app", "safetyLevel": "informational" },
+        { "id": "wrong-config", "type": "root_cause", "title": "Root cause: wrong host/port for where the dependency actually runs", "body": "The configured address doesn't match where the dependency lives — for example use the Docker Compose service name instead of localhost, or the Kubernetes Service DNS name (<service>.<namespace>.svc.cluster.local) instead of 127.0.0.1. The exact fix is app/environment specific from here." },
+        { "id": "check-dependency-status", "type": "test", "title": "Did the dependency actually finish starting, or has it crashed?", "body": "The configured address genuinely matches where the dependency should be — check the dependency's own logs/status rather than the connecting app's.", "command": "kubectl logs <dependency-pod> -n <namespace> --previous", "commandLanguage": "sh", "expectedOutput": "(dependency's own startup or crash log)", "safetyLevel": "informational" },
+        { "id": "startup-race", "type": "root_cause", "title": "Root cause: startup-order race", "body": "The dependency isn't running yet, is still starting, or crashed — the Node app tried to connect before it was actually accepting connections. The robust fix is retrying the connection with backoff on the Node side; the alternative is an explicit startup dependency, such as Compose's depends_on with a healthcheck condition, or a Kubernetes init container that waits for the dependency to be ready." },
+        { "id": "listening-but-refused", "type": "terminal", "title": "Dependency believes it's listening but still refuses this app", "body": "The dependency's own logs say it started and is listening, yet this app still gets refused — check that it's actually listening on the interface the app connects through (a service bound only to 127.0.0.1 inside its own container refuses connections from other containers/pods, which need it bound to 0.0.0.0), and that both sides are on the same Docker network / Kubernetes namespace with an actual route between them." }
+      ],
+      "edges": [
+        { "from": "start", "to": "check-listening", "condition": "passed" },
+        { "from": "check-listening", "to": "config-mismatch", "condition": "passed" },
+        { "from": "check-listening", "to": "still-listening", "condition": "failed" },
+        { "from": "check-listening", "to": "config-mismatch", "condition": "unknown" },
+        { "from": "config-mismatch", "to": "wrong-config", "condition": "passed" },
+        { "from": "config-mismatch", "to": "check-dependency-status", "condition": "failed" },
+        { "from": "config-mismatch", "to": "check-dependency-status", "condition": "unknown" },
+        { "from": "check-dependency-status", "to": "startup-race", "condition": "passed" },
+        { "from": "check-dependency-status", "to": "listening-but-refused", "condition": "failed" },
+        { "from": "check-dependency-status", "to": "listening-but-refused", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://nodejs.org/api/errors.html#common-system-errors", "title": "Common System Errors", "type": "official_docs", "publisher": "Node.js" }
+      ]
+    },
+    {
+      "slug": "node-eaddrinuse-port-in-use",
+      "problemTitle": "Node process crashes on startup with EADDRINUSE",
+      "problemSummary": "A Node.js process fails at startup with 'Error: listen EADDRINUSE: address already in use' because something else already has that port bound — often a leftover instance of the same dev server that didn't fully exit, which is especially common on Windows where Ctrl+C doesn't always propagate to a whole process tree spawned through a shell wrapper.",
+      "title": "Freeing a port stuck with EADDRINUSE",
+      "summary": "Identifies what actually holds the port, checks whether it's an orphaned instance of the same app versus a different legitimate service, and verifies the port is free afterward. It does not cover a port genuinely reserved by the OS or blocked by a firewall — EADDRINUSE specifically means something is bound, not that access is denied.",
+      "symptoms": [
+        "Node process exits immediately on startup with: Error: listen EADDRINUSE: address already in use",
+        "The same port worked a moment ago before a restart or crash",
+        "More common right after Ctrl+C-ing a dev server and immediately restarting it"
+      ],
+      "signatures": [
+        { "errorCode": "EADDRINUSE", "normalisedMessage": "error: listen eaddrinuse: address already in use", "languageHint": "javascript", "runtimeHint": "node" }
+      ],
+      "technologies": ["nodejs"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Node process crashes on startup with EADDRINUSE", "body": "Something else already has this exact port bound. The fix depends on whether that's a leftover instance of your own app or a different service that legitimately needs the port." },
+        { "id": "find-pid", "type": "test", "title": "Find out what's already using the port", "body": "On Linux/macOS use lsof or ss; on Windows use netstat with findstr, then look up the owning process by PID.", "command": "netstat -ano | findstr :8787", "commandLanguage": "powershell", "expectedOutput": "  TCP    0.0.0.0:8787           0.0.0.0:0              LISTENING       14832", "safetyLevel": "informational" },
+        { "id": "port-free-now", "type": "terminal", "title": "Nothing is bound to that port right now", "body": "The port isn't actually in use any more — it may have already been released, or on Windows in particular can briefly show as in-use during TIME_WAIT for a few seconds after a process exits. Re-run and see if it recurs." },
+        { "id": "same-app", "type": "test", "title": "Is the process holding the port an old instance of this same app?", "body": "Check the owning PID's command line against this project — a very common dev-mode cause is a previous run (via nodemon or npm run dev) that didn't fully exit.", "command": "Get-CimInstance Win32_Process -Filter \"ProcessId = 14832\" | Select-Object CommandLine", "commandLanguage": "powershell", "expectedOutput": "CommandLine\n-----------\nnode C:\\projects\\api\\src\\server.js", "safetyLevel": "informational" },
+        { "id": "kill-process", "type": "fix", "title": "Fix: terminate the leftover process", "body": "Confirm the PID and command line first — force-killing the wrong process can lose unsaved work in whatever it actually is.", "command": "taskkill /PID 14832 /F", "commandLanguage": "powershell", "safetyLevel": "state_changing", "safetyEffect": "Force-terminates that process immediately, releasing any port or resource it held." },
+        { "id": "other-owner", "type": "root_cause", "title": "Root cause: a different, legitimate service owns that port", "body": "The process holding the port isn't this app — either stop that other service if you don't actually need both running, or change this app's own port (its PORT env var or config) instead of freeing a port something else needs." },
+        { "id": "verify-free", "type": "verification", "title": "Confirm the port is free and the app starts", "body": "Re-check the port, then start the app again.", "command": "netstat -ano | findstr :8787", "commandLanguage": "powershell", "expectedOutput": "(no output)", "safetyLevel": "informational" },
+        { "id": "done", "type": "terminal", "title": "Resolved", "body": "The port is free and the app starts normally." }
+      ],
+      "edges": [
+        { "from": "start", "to": "find-pid", "condition": "passed" },
+        { "from": "find-pid", "to": "same-app", "condition": "passed" },
+        { "from": "find-pid", "to": "port-free-now", "condition": "failed" },
+        { "from": "find-pid", "to": "same-app", "condition": "unknown" },
+        { "from": "same-app", "to": "kill-process", "condition": "passed" },
+        { "from": "same-app", "to": "other-owner", "condition": "failed" },
+        { "from": "same-app", "to": "other-owner", "condition": "unknown" },
+        { "from": "kill-process", "to": "verify-free", "condition": "passed" },
+        { "from": "verify-free", "to": "done", "condition": "passed" },
+        { "from": "verify-free", "to": "find-pid", "condition": "failed" },
+        { "from": "verify-free", "to": "find-pid", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://nodejs.org/api/errors.html#common-system-errors", "title": "Common System Errors", "type": "official_docs", "publisher": "Node.js" }
+      ]
+    },
+    {
+      "slug": "node-err-module-not-found-esm-upgrade",
+      "problemTitle": "ERR_MODULE_NOT_FOUND after a Node.js upgrade",
+      "problemSummary": "A Node.js app throws ERR_MODULE_NOT_FOUND right after upgrading Node (e.g. from 20 to 22), most often because the upgrade came bundled with a dependency/lockfile update, and either a relative import is missing its required file extension under the ESM loader, or an installed package's package.json 'exports' map no longer exposes a subpath the code imports.",
+      "title": "Diagnosing ERR_MODULE_NOT_FOUND after upgrading Node",
+      "summary": "Node's ESM resolver rules around mandatory file extensions and 'exports' enforcement are not new in Node 22 — the summary is important here: the upgrade is usually the trigger only because it came with a lockfile/dependency refresh, not because Node itself changed how it resolves modules. Splits the failing specifier into your own relative import (missing extension) versus a dependency (its exports map tightened). It does not cover a plain 'Cannot find module' with no ERR_ prefix right after npm install — that's a CommonJS-style resolution failure covered by a separate playbook.",
+      "symptoms": [
+        "App throws: Error [ERR_MODULE_NOT_FOUND]: Cannot find module ... imported from ...",
+        "Started immediately after upgrading Node.js (for example from 20 to 22)",
+        "Worked before the upgrade with no code changes to the failing import"
+      ],
+      "signatures": [
+        { "errorCode": "ERR_MODULE_NOT_FOUND", "normalisedMessage": "err_module_not_found: cannot find module imported from", "languageHint": "javascript", "runtimeHint": "node" }
+      ],
+      "technologies": ["nodejs"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "ERR_MODULE_NOT_FOUND after upgrading Node", "body": "Node's mandatory-extension and package.json 'exports' rules under \"type\": \"module\" have been in place since ESM support landed, well before Node 20 or 22 — the version upgrade is usually the trigger only because it shipped with a dependency/lockfile update, not because Node's own resolution rules changed." },
+        { "id": "classify-specifier", "type": "test", "title": "Does the failing specifier point at your own file, or an installed package?", "body": "Read the error's 'Cannot find module ...' line: a specifier starting with ./ or ../ is your own code; a bare name is a dependency.", "command": "# read the exact specifier from the error text", "commandLanguage": "sh", "expectedOutput": "Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/app/src/utils' imported from /app/src/index.js", "safetyLevel": "informational" },
+        { "id": "own-file-fix", "type": "fix", "title": "Fix: add the required file extension to the relative import", "body": "Node's ESM loader requires the extension on relative specifiers — import { thing } from './utils' fails under \"type\": \"module\" even if it worked under CommonJS or a bundler that resolved extensions for you. Change it to './utils.js' (or whatever the actual compiled output extension is). If this previously ran through a build/transpile step that isn't running any more after the upgrade, that step disappearing is the real trigger, not Node 22 itself." },
+        { "id": "dependency-exports", "type": "test", "title": "Check the dependency's package.json 'exports' field for the path being imported", "body": "A newer version of the dependency may have added or tightened an 'exports' map, which blocks any import path not explicitly listed — including deep imports that used to work.", "command": "cat node_modules/<package-name>/package.json | grep -A20 '\"exports\"'", "commandLanguage": "sh", "expectedOutput": "\"exports\": {\n  \".\": \"./index.js\",\n  \"./package.json\": \"./package.json\"\n}", "safetyLevel": "informational" },
+        { "id": "exports-blocking", "type": "root_cause", "title": "Root cause: the dependency's exports map no longer allows this import path", "body": "The subpath being imported genuinely isn't listed in the package's 'exports' map. Import only the paths it actually exposes (usually the package root or a documented subpath), or pin the dependency to the last version before 'exports' was added or tightened if the internal path is genuinely required." },
+        { "id": "exports-fine", "type": "terminal", "title": "The exports map isn't blocking this", "body": "The path being imported is listed in 'exports', or the package has no 'exports' field at all. Check instead whether the package actually installed correctly for this Node version (npm ls <package-name> for peer-dependency warnings), and whether two copies of it exist at different versions in node_modules, where a stale nested copy can shadow the top-level one." }
+      ],
+      "edges": [
+        { "from": "start", "to": "classify-specifier", "condition": "passed" },
+        { "from": "classify-specifier", "to": "own-file-fix", "condition": "passed" },
+        { "from": "classify-specifier", "to": "dependency-exports", "condition": "failed" },
+        { "from": "classify-specifier", "to": "dependency-exports", "condition": "unknown" },
+        { "from": "dependency-exports", "to": "exports-blocking", "condition": "passed" },
+        { "from": "dependency-exports", "to": "exports-fine", "condition": "failed" },
+        { "from": "dependency-exports", "to": "exports-fine", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://nodejs.org/api/esm.html#mandatory-file-extensions", "title": "Mandatory file extensions", "type": "official_docs", "publisher": "Node.js" }
+      ]
+    },
+    {
+      "slug": "node-cannot-find-module-missing-install",
+      "problemTitle": "Cannot find module right after a fresh clone despite npm install succeeding",
+      "problemSummary": "A Node.js app throws a plain 'Cannot find module' (no ERR_ prefix) immediately after a fresh clone, even though npm install reported no errors — the module genuinely isn't in node_modules, most often because it's a platform-specific optional dependency skipped for a different OS/architecture, or the lockfile is out of sync with package.json.",
+      "title": "Diagnosing a missing module npm install silently didn't provide",
+      "summary": "Confirms the module truly isn't installed, then checks the two most common install-time reasons: a platform-specific optionalDependency (native addons like esbuild/sharp binaries) skipped because the install environment's OS/architecture didn't match the runtime environment's, and a lockfile out of sync with package.json. It does not cover an ESM 'ERR_MODULE_NOT_FOUND' extension or exports-map error, which is a resolution-time problem with a package that IS installed, covered by a separate playbook.",
+      "symptoms": [
+        "App throws: Error: Cannot find module '<package-name>'",
+        "npm install (or npm ci) completed with exit code 0 and no visible errors",
+        "Reproduces reliably right after a fresh git clone or in a fresh Docker build stage"
+      ],
+      "signatures": [
+        { "errorCode": "MODULE_NOT_FOUND", "normalisedMessage": "error: cannot find module '<package-name>'", "languageHint": "javascript", "runtimeHint": "node" }
+      ],
+      "technologies": ["nodejs"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Cannot find module despite a clean npm install", "body": "npm reporting success doesn't guarantee everything your code imports actually landed in node_modules — optional/platform-specific packages and lockfile drift are both silent by design in different ways." },
+        { "id": "check-node-modules", "type": "test", "title": "Is the missing module actually present in node_modules?", "body": "Confirm the directory genuinely doesn't exist before assuming this is an install problem at all.", "command": "ls node_modules/<package-name>", "commandLanguage": "sh", "expectedOutput": "ls: cannot access 'node_modules/<package-name>': No such file or directory", "safetyLevel": "informational" },
+        { "id": "path-issue", "type": "terminal", "title": "The package is actually installed — this isn't a missing-install problem", "body": "Check the exact import path and casing instead (Linux is case-sensitive; a path that works on macOS/Windows can 404 on Linux CI), or a package.json 'exports' restriction blocking a deep import — that's covered by the ESM ERR_MODULE_NOT_FOUND playbook, not this one." },
+        { "id": "optional-native", "type": "test", "title": "Is it a platform-specific optional dependency (a native addon)?", "body": "Packages like esbuild, sharp, or @swc/core ship per-platform binary packages under optionalDependencies, which npm silently skips installing when they don't match the current OS/CPU. That's by design, not a bug.", "command": "grep -A5 '\"optionalDependencies\"' package.json", "commandLanguage": "sh", "expectedOutput": "\"optionalDependencies\": {\n  \"@esbuild/linux-x64\": \"0.21.5\",\n  \"@esbuild/darwin-arm64\": \"0.21.5\"\n}", "safetyLevel": "informational" },
+        { "id": "platform-mismatch", "type": "root_cause", "title": "Root cause: install and runtime environments don't share an OS/architecture", "body": "If the environment that ran npm install (for example an earlier Docker build stage, or a CI cache) has a different OS or CPU architecture than the one actually running the app, the platform package for the runtime environment never gets installed. Run npm install (or npm ci) inside the actual target environment/architecture rather than copying a node_modules built elsewhere, or explicitly install the correct platform package there." },
+        { "id": "lockfile-check", "type": "test", "title": "Does package.json list the dependency, and does the lockfile agree?", "body": "Check both files for the dependency, and confirm the lockfile actually matches the package manager being used to install (an npm ci run against a yarn.lock, or vice versa, won't add anything).", "command": "grep '\"<package-name>\"' package.json package-lock.json", "commandLanguage": "sh", "expectedOutput": "package.json:  \"<package-name>\": \"^2.1.0\",", "safetyLevel": "informational" },
+        { "id": "lockfile-mismatch", "type": "fix", "title": "Fix: resync the lockfile with package.json", "body": "The dependency is listed in package.json but missing (or mismatched) in the lockfile — commonly because a lockfile update wasn't committed, a merge conflict dropped the entry, or the wrong package manager's lockfile is in use. Regenerate it, then commit the result.", "command": "npm install", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Rewrites package-lock.json to match package.json (adding the missing entry) and installs into node_modules; commit the updated lockfile afterward so CI and other clones stay in sync." },
+        { "id": "other-mismatch", "type": "terminal", "title": "package.json and the lockfile already agree", "body": "This isn't a missing-entry problem — check whether the install step actually ran in the directory containing this package.json at all (a monorepo/workspace-root vs subpackage mismatch is a common way for npm install to report success while installing a different package.json's dependencies), or whether a project .npmrc points installs at a different registry that silently no-ops for a private package it can't reach." }
+      ],
+      "edges": [
+        { "from": "start", "to": "check-node-modules", "condition": "passed" },
+        { "from": "check-node-modules", "to": "optional-native", "condition": "passed" },
+        { "from": "check-node-modules", "to": "path-issue", "condition": "failed" },
+        { "from": "check-node-modules", "to": "optional-native", "condition": "unknown" },
+        { "from": "optional-native", "to": "platform-mismatch", "condition": "passed" },
+        { "from": "optional-native", "to": "lockfile-check", "condition": "failed" },
+        { "from": "optional-native", "to": "lockfile-check", "condition": "unknown" },
+        { "from": "lockfile-check", "to": "lockfile-mismatch", "condition": "passed" },
+        { "from": "lockfile-check", "to": "other-mismatch", "condition": "failed" },
+        { "from": "lockfile-check", "to": "other-mismatch", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://docs.npmjs.com/cli/v10/commands/npm-ci", "title": "npm ci", "type": "official_docs", "publisher": "npm" }
+      ]
+    },
+    {
+      "slug": "bun-panic-main-thread-native-module",
+      "problemTitle": "Bun panics loading a native addon that worked on an earlier Bun version",
+      "problemSummary": "Bun crashes with 'panic(main thread): ...' while loading a native (.node) addon that worked fine on an earlier Bun version, most likely because Bun's Node-API/native-addon compatibility layer — which is not a complete implementation of Node's N-API surface — changed between those releases.",
+      "title": "Diagnosing a Bun panic loading a native addon",
+      "summary": "Confirms the failure is specific to Bun (by checking the same code under plain Node) before treating it as a Bun compatibility regression, then checks for a documented compatible module/Bun version pairing to pin to. This is intentionally left diagnostic rather than prescriptive beyond that point: Bun's native-addon compatibility is an evolving, partial implementation, and asserting a specific cause for a specific version pair without checking that pair's actual changelog/issues would be a guess, not a fact.",
+      "symptoms": [
+        "Process crashes with: panic(main thread): <message>",
+        "Only reproduces under bun, not under node, for the same code",
+        "Started after upgrading the Bun runtime version, with no changes to the native module itself"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "panic(main thread):", "languageHint": null, "runtimeHint": "bun" }
+      ],
+      "technologies": ["bun"],
+      "nodes": [
+        { "id": "start", "type": "start", "title": "Bun panics loading a native addon after a version upgrade", "body": "Bun's support for native (.node) Node-API addons is not a complete implementation of Node's N-API/ABI surface, and what it does implement has changed across releases — so a module that happened to work on one Bun version can regress on a later one without any change to your own code or the addon." },
+        { "id": "check-under-node", "type": "test", "title": "Does the exact same code work under plain Node.js instead of Bun?", "body": "This is the single most useful check: it separates a Bun-specific compatibility gap from a genuinely broken native module.", "command": "node -e \"require('<native-module>')\"", "commandLanguage": "sh", "expectedOutput": "(loads without error)", "safetyLevel": "informational" },
+        { "id": "not-bun-specific", "type": "terminal", "title": "This isn't Bun-specific", "body": "If it also fails under plain Node, the addon itself is broken for this platform — most likely the wrong prebuilt binary architecture, or it needs rebuilding: npm rebuild <module-name>, or re-running its install script. Chase it as a normal native-module build problem, not a Bun panic." },
+        { "id": "compatible-version-exists", "type": "test", "title": "Is there a documented compatible pairing of module version and Bun version?", "body": "Check the native module's own README/issues for stated Bun compatibility, and check bun --version against any minimum/maximum Bun version the module documents.", "command": "bun --version", "commandLanguage": "sh", "expectedOutput": "1.2.4", "safetyLevel": "informational" },
+        { "id": "pin-fix", "type": "fix", "title": "Fix: pin to the documented compatible pairing", "body": "Pin either the native module or the Bun runtime itself to the last version documented as working together, until the incompatibility is resolved upstream. Re-run your test suite afterward — pinning an older module or runtime version can reintroduce other bugs that were fixed since.", "command": "bun add <module-name>@<compatible-version>", "commandLanguage": "sh", "safetyLevel": "state_changing", "safetyEffect": "Changes the installed version of the native module for this project (updating package.json and bun.lockb); it does not affect the Bun runtime itself unless you separately pin that via your version manager." },
+        { "id": "unresolved", "type": "root_cause", "title": "Root cause: unresolved Bun/native-addon incompatibility", "body": "No documented compatible pairing exists yet. There is no generic fix to hand you here, because it depends on exactly which N-API surface the addon uses that this Bun version doesn't yet implement correctly. Practical options are running this part of the app under Node instead of Bun (a small Node-run subprocess or worker), or filing/tracking the issue upstream in Bun's own repository." }
+      ],
+      "edges": [
+        { "from": "start", "to": "check-under-node", "condition": "passed" },
+        { "from": "check-under-node", "to": "compatible-version-exists", "condition": "passed" },
+        { "from": "check-under-node", "to": "not-bun-specific", "condition": "failed" },
+        { "from": "check-under-node", "to": "not-bun-specific", "condition": "unknown" },
+        { "from": "compatible-version-exists", "to": "pin-fix", "condition": "passed" },
+        { "from": "compatible-version-exists", "to": "unresolved", "condition": "failed" },
+        { "from": "compatible-version-exists", "to": "unresolved", "condition": "unknown" }
+      ]
+    }
+  ]
+}
