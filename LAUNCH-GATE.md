@@ -44,7 +44,7 @@ else on this page matters.
 | 4 | The diagnostic flow works without JavaScript | ✅ 10 tests with JS disabled |
 | 5 | Evidence is segmented by environment, never averaged | ✅ compatibility matrix + conflict sentences |
 | 6 | Sign-in works, or says plainly that it is unconfigured | ⚠️ **unconfigured path verified; OAuth round-trip untested** — blocked on A0-4 |
-| 7 | Malicious prompt text stays data; malformed model output fails safely | ⚠️ **structurally enforced and unit-tested; no real model call has been made** |
+| 7 | Malicious prompt text stays data; malformed model output fails safely | ✅ 10/10 against the real provider; the deployed consumer has not yet run a live contribution |
 | 8 | A reproduction can be filed in 10–30 seconds | ✅ |
 | 9 | Historical revisions survive and keep their own evidence | ✅ 11 tests against production |
 | 10 | Admin refuses everything until Access is configured | ✅ Access enforcing on every path; Worker still fails closed on a variable-name mismatch (§5) |
@@ -79,11 +79,16 @@ not a lie.
 cannot be simulated. Everything below the surface has been tested; whether a developer
 at 3am finds this faster than a search engine is not something a test suite can answer.
 
-**No real model call has been made.** `ANTHROPIC_API_KEY` is not set on the Worker that
-reads it (see §5), so the
-structuring pipeline has never run end to end against the live API. The advisory
-boundary is enforced structurally and unit-tested, and `scripts/verify-ai.mjs` exists
-to prove the injection resistance — it has not been run against production.
+**The model has now been called, and the injection corpus holds.** `verify-ai.mjs` ran
+against `claude-opus-5` on 22 August 2026: **10/10**. Four hostile submissions came back as
+content with the schema intact, five forbidden tasks threw before a request was built, and
+moderation assist flagged a destructive command and a pasted credential.
+[`docs/evidence/ai-boundary-2026-08-22.txt`](docs/evidence/ai-boundary-2026-08-22.txt).
+
+What that does **not** cover: the deployed queue consumer has still never structured a real
+contribution end to end. Doing so writes production data and is an owner decision. And a
+four-entry corpus plus a model's refusal is a behaviour, not a guarantee — the structural
+controls are what hold regardless.
 
 **Sign-in is unconfigured.** Blocked on A0-4. Everything else works; reports filed now
 are shown and not counted, which the form says before submission.
@@ -109,7 +114,7 @@ untouched because two concurrent sessions were writing.
 | A0-1 | **Done** for `dev-admin.itisyou.app` — Access application created and enforcing on every path. See the note below | — |
 | A0-3 | Decide the public content licence and contribution terms (ADR-0013) | Opening unrestricted public contribution |
 | A0-4 | Register a GitHub OAuth app; set `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` as Worker Secrets | Sign-in, and therefore counted reproductions |
-| — | Move `ANTHROPIC_API_KEY` from `devyou-app` to `devyou-jobs` | AI structuring in the contribution pipeline |
+| — | **Done** — `ANTHROPIC_API_KEY` moved to `devyou-jobs` and deleted from `devyou-app` | — |
 
 ### A0-1, verified 22 August 2026
 
@@ -132,17 +137,23 @@ is fixed in source and not yet in production.
 protect.** `devyou-admin-staging` has never been deployed. That is a coherent state — an
 absent Worker cannot be reached — but it is not the state this table previously implied.
 
-### The Anthropic key is on the wrong Worker
+### The Anthropic key was on the wrong Worker
 
-`ANTHROPIC_API_KEY` is set on **`devyou-app`**, the public request-path Worker, which has
-no code that reads it. `devyou-jobs`, which does read it, has no secrets at all.
+It was set on **`devyou-app`** — the public request-path Worker, which has no code that
+reads it — while `devyou-jobs`, which does read it, had no secrets at all.
 
 The split those two Workers exist to enforce is stated in `apps/jobs/wrangler.jsonc`: no
 request path may spend money on a model call, so the public Worker produces a queue message
 and the jobs Worker — which has no hostname and no `fetch` handler — holds the credential
-and consumes it. A key on `devyou-app` is a paid, prompt-injectable credential sitting in
-the environment of the one Worker the open internet can reach. Nothing reads it today; the
-control was that nothing *could*.
+and consumes it. A key on `devyou-app` was a paid, prompt-injectable credential sitting in
+the environment of the one Worker the open internet can reach. Nothing read it; the control
+was supposed to be that nothing *could*.
+
+Moved to `devyou-jobs` and deleted from `devyou-app` on 22 August 2026. The value was piped
+from the gitignored `.env` straight into wrangler's stdin, so it was never printed, stored,
+or written anywhere. `apps/app/worker-secrets.d.ts` no longer declares the variable either,
+so `env.ANTHROPIC_API_KEY` in the public Worker is now a compile error as well as an absent
+binding — two independent reasons, which is the right number for a control this quiet.
 
 A0-2 (DNS and custom domains) is **closed** — the production deploy created
 `dev.itisyou.app` and `dev-admin.itisyou.app` as custom domains, and both resolve.

@@ -143,11 +143,18 @@ migration; a content change is a new revision.
 
 ## Immediately next
 
-1. **A0-1** — the Access application. Until then the admin surface serves nothing.
+1. ~~**A0-1** — the Access application.~~ **Done**, and enforcing on every path. The AUD had
+   been stored as `CF_ACCESS_AUD` while the Worker read `CF_ACCESS_POLICY_AUD`, so the
+   console still served nothing from behind a correctly configured gate. Renamed in source
+   and redeployed.
 2. **A0-4** — the GitHub OAuth app. Until then no reproduction can be counted toward a
    confidence band, which means no playbook can leave `Unverified`.
-3. `ANTHROPIC_API_KEY` on `devyou-jobs`, then run `scripts/verify-ai.mjs` against a real
-   model before the contribution pipeline is opened.
+3. ~~`ANTHROPIC_API_KEY` on `devyou-jobs`~~ — **done.** It had been set on `devyou-app`, the
+   public request-path Worker, which has no code that reads it. Moved to `devyou-jobs` and
+   deleted from `devyou-app`. `scripts/verify-ai.mjs` then returned 10/10 against
+   `claude-opus-5` — the first real model call this product has made
+   ([evidence](docs/evidence/ai-boundary-2026-08-22.txt)). The deployed queue consumer has
+   still not structured a live contribution end to end.
 4. **A0-3** — the content licence, before unrestricted public contribution.
 5. Closed validation with real developers (plan §13). It is the one gate no amount of
    further engineering closes.
