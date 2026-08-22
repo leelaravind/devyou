@@ -1,0 +1,1455 @@
+{
+  "$comment": "DevYou seed playbook corpus — Cloudflare/edge portion. 12 playbooks covering D1, Workers, R2, Durable Objects, Wrangler and Drizzle-on-D1. Written and reviewed against developers.cloudflare.com as of August 2026; every asserted platform behaviour is grounded in a fetched doc page, and every place we were not confident of the exact mechanism was written as a diagnostic check rather than a flat assertion. See scripts/seed-playbooks.mjs for how this file is consumed.",
+  "playbooks": [
+    {
+      "slug": "d1-sqlite-busy-concurrent-writes",
+      "problemTitle": "D1 returns SQLITE_BUSY under concurrent writes",
+      "problemSummary": "A write query against a Cloudflare D1 database fails with SQLITE_BUSY / \"database is locked\" when another write to the same database lands at nearly the same moment.",
+      "title": "Fixing D1 SQLITE_BUSY errors from concurrent writes",
+      "summary": "Covers SQLITE_BUSY caused by two or more write requests colliding on the same D1 database (including a Worker request racing a Cron Trigger), and by a single invocation issuing many unbatched writes in a row. Does not cover SQLITE_BUSY from an actually-stuck transaction left open by a crashed process, or D1's separate CPU-time/memory-limit resets — those return different, more specific error messages.",
+      "symptoms": [
+        "A D1 write throws \"D1_ERROR: database is locked: SQLITE_BUSY\" or \"SQLITE_BUSY: database is locked\"",
+        "The error only appears under load or when two write paths can run at the same time (e.g. a user action and a Cron Trigger)",
+        "Reads and single-writer traffic work fine; the error only shows up once a second write source is introduced"
+      ],
+      "signatures": [
+        {
+          "errorCode": "SQLITE_BUSY",
+          "normalisedMessage": "d1_error: database is locked: sqlite_busy",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["cloudflare-d1", "cloudflare-workers"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "D1 write throws SQLITE_BUSY",
+          "body": "A write against D1 (INSERT/UPDATE/DELETE via `db.prepare(...).run()` or `db.batch(...)`) throws an error containing SQLITE_BUSY or \"database is locked\"."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Check whether two writes are landing at the same moment",
+          "body": "D1's SQLite storage backend allows only one write transaction to commit at a time per database. Tail your Worker's logs and see whether the failing write overlaps in time with another write to the same database — a second user request, a Cron Trigger, or a queue consumer are the usual culprits.",
+          "command": "npx wrangler tail --format pretty",
+          "commandLanguage": "sh",
+          "expectedOutput": "Two fetch invocations with near-identical timestamps, the second one ending in the D1_ERROR: database is locked: SQLITE_BUSY line.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Retry the write with backoff",
+          "body": "This is expected SQLite behaviour, not a bug: when two write transactions collide, one of them has to lose. D1's own docs recommend retrying transient errors — SQLITE_BUSY included — with a bounded exponential backoff rather than surfacing the failure to the caller.",
+          "command": "async function runWithRetry(fn, maxAttempts = 5) {\n  for (let attempt = 1; ; attempt++) {\n    try {\n      return await fn();\n    } catch (err) {\n      const retryable = String(err).includes(\"SQLITE_BUSY\") || String(err).includes(\"database is locked\");\n      if (!retryable || attempt >= maxAttempts) throw err;\n      const delayMs = 2 ** attempt * 20 + Math.random() * 50;\n      await new Promise((r) => setTimeout(r, delayMs));\n    }\n  }\n}\n\n// await runWithRetry(() => env.DB.prepare(\"UPDATE accounts SET balance = ? WHERE id = ?\").bind(newBalance, id).run());",
+          "commandLanguage": "ts",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Adds retry-with-backoff around the existing write. It does not change what data is written — only how many times a transient SQLITE_BUSY is retried (up to 5 attempts here) before the error is allowed through to the caller."
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check whether one invocation issues many separate write statements in a loop",
+          "body": "Look at the failing code path for a loop that calls `.prepare(...).bind(...).run()` once per row, instead of combining the writes into a single `db.batch([...])` call. Each separate call is its own round trip, which widens the window in which another invocation's write can collide with yours.",
+          "command": "grep -n \"\\.prepare(\" src/**/*.ts",
+          "commandLanguage": "sh",
+          "expectedOutput": "Multiple `.prepare(...)` calls inside a `for`/`.map()` loop rather than a single `db.batch([...])` call.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Combine the loop of writes into one db.batch() call",
+          "body": "D1's `batch()` method sends every statement in one request and D1 runs them sequentially inside a single transaction. That drops N separate write round trips down to one, shrinking the collision window with any other writer.",
+          "command": "const statements = rows.map((row) =>\n  env.DB.prepare(\"UPDATE items SET qty = ? WHERE id = ?\").bind(row.qty, row.id)\n);\nawait env.DB.batch(statements);",
+          "commandLanguage": "ts",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Executes the same writes as a single D1 batch transaction instead of N sequential ones. The resulting data is unchanged; only the number of separate write transactions drops from N to 1."
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Not a write-write collision — escalate",
+          "body": "If neither retrying nor batching resolves it, this may be a transaction left open by a previous failed request, or two different Workers/bindings pointed at the same database_id and racing each other in a way retries can't smooth over. Check `wrangler d1 info <DATABASE_NAME>` for anything unexpected, and if it persists outside of load testing, file it with Cloudflare support — this is outside what SQLITE_BUSY retry logic can fix."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Re-run under the same concurrent load",
+          "body": "Reproduce whatever originally triggered the error — two parallel requests, or a manual Cron Trigger invocation alongside a normal request — and confirm SQLITE_BUSY no longer reaches the client.",
+          "command": "curl -s https://your-worker.example.workers.dev/write & curl -s https://your-worker.example.workers.dev/write & wait",
+          "commandLanguage": "sh",
+          "expectedOutput": "Both requests return a normal 200 response; neither surfaces a D1_ERROR.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "The write path now retries transient contention and/or batches related writes, so occasional overlap no longer surfaces as an error to the caller."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/d1/observability/debug-d1/",
+          "title": "Debug D1",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/d1/best-practices/retry-queries/",
+          "title": "Retry queries",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "d1-too-many-subrequests-single-invocation",
+      "problemTitle": "D1_ERROR: too many API requests by single worker invocation",
+      "problemSummary": "A Worker invocation throws D1_ERROR: too many API requests by single worker invocation after issuing a large number of separate D1 queries — typically an N+1 loop — within one request.",
+      "title": "Fixing D1's \"too many API requests by single worker invocation\" error",
+      "summary": "Covers the D1-specific per-invocation request cap being hit by an N+1 query pattern or by combining many D1 calls with other subrequests in one invocation. Does not cover the general Workers subrequest limit for fetch()-only Workers with no D1 involved (see Workers platform limits), and does not cover D1's separate CPU-time or memory-limit resets, which return different error text entirely.",
+      "symptoms": [
+        "A request that touches many rows fails partway through with D1_ERROR: too many API requests by single worker invocation",
+        "The error appears only for requests that loop over a list and query D1 once per item",
+        "Smaller data sets or fewer rows succeed; the error appears once volume crosses some threshold"
+      ],
+      "signatures": [
+        {
+          "errorCode": "D1_ERROR",
+          "normalisedMessage": "d1_error: too many api requests by single worker invocation",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["cloudflare-d1", "cloudflare-workers"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "D1_ERROR: too many API requests by single worker invocation",
+          "body": "A single Worker invocation that makes many separate calls to D1 fails partway through with this D1-specific error, distinct from D1's CPU-time or memory-limit reset messages."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Count how many separate D1 calls happen in this one invocation",
+          "body": "Look for an N+1 pattern: a loop that runs one `env.DB.prepare(...).run()` (or `.all()`/`.first()`) per row instead of one query covering all the rows, or one `db.batch()` call.",
+          "command": "grep -n \"env.DB.prepare\\|\\.first(\\|\\.all(\\|\\.run(\" src/**/*.ts",
+          "commandLanguage": "sh",
+          "expectedOutput": "A `.prepare(...)` call sitting inside a `for` loop or `.map()`/`.forEach()` over a list of rows.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Replace the N+1 loop with one query or one batch",
+          "body": "Collapse the per-row queries into a single query with `WHERE id IN (...)`, or, when each row needs a different statement (e.g. different values on an UPDATE), combine them into one `db.batch([...])` call. Either way this turns N D1 requests into one.",
+          "command": "// Before: one query per row\n// for (const id of ids) { await env.DB.prepare(\"SELECT * FROM items WHERE id = ?\").bind(id).first(); }\n\n// After: one query for all rows\nconst placeholders = ids.map(() => \"?\").join(\",\");\nconst { results } = await env.DB.prepare(\n  `SELECT * FROM items WHERE id IN (${placeholders})`\n).bind(...ids).all();",
+          "commandLanguage": "ts",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Changes how the data is fetched (one query instead of N), not what is returned. For writes, batching via db.batch() still executes every statement — it just sends them in one round trip."
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check whether other subrequests share the invocation",
+          "body": "D1 calls count against the same per-invocation subrequest budget as fetch(), KV, and R2 calls. If this invocation also makes several other bound-service calls alongside its D1 queries, the combined total — not D1 alone — may be what's tipping it over.",
+          "command": "grep -n \"env\\.\\(DB\\|KV\\|R2\\|BUCKET\\)\\.\\|fetch(\" src/**/*.ts",
+          "commandLanguage": "sh",
+          "expectedOutput": "Several distinct bound-service calls (D1, KV, R2, fetch) all inside the same handler.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Reduce total subrequests, or raise the configured limit",
+          "body": "First prefer reducing the total number of calls (the N+1 fix above, or caching repeated lookups). If the workload genuinely needs a high subrequest count, Workers Paid plans can raise the configured `limits.subrequests` above the 10,000 default, up to 10,000,000.",
+          "command": "{\n  \"limits\": {\n    \"subrequests\": 50000\n  }\n}",
+          "commandLanguage": "jsonc",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Raises the maximum number of subrequests this Worker may make per invocation. It does not reduce or change any query results — it only allows more calls before the runtime cuts the invocation off. Available on the Workers Paid plan."
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Not a request-count issue — escalate",
+          "body": "If the invocation genuinely makes few D1 calls and this error still appears, check for an actual infinite loop or unbounded recursion calling the same query repeatedly, rather than a data-volume problem."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Re-run with representative data volume",
+          "body": "Repeat the request that previously failed, using the same (or larger) row count, and confirm it completes without the D1_ERROR.",
+          "command": "curl -s https://your-worker.example.workers.dev/bulk-endpoint",
+          "commandLanguage": "sh",
+          "expectedOutput": "A normal 200 response covering the full data set, with no D1_ERROR in wrangler tail.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "The invocation now makes far fewer D1 requests (or has room for the ones it needs), and the error no longer occurs."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/workers/platform/limits/",
+          "title": "Limits",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/d1/worker-api/d1-database/",
+          "title": "D1 Database",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "d1-sqlite-constraint-unique-violation",
+      "problemTitle": "D1_ERROR: UNIQUE constraint failed (SQLITE_CONSTRAINT)",
+      "problemSummary": "An INSERT into D1 fails with SQLITE_CONSTRAINT / \"UNIQUE constraint failed\" because a row with the same unique-column value already exists.",
+      "title": "Handling D1 UNIQUE constraint violations",
+      "summary": "Covers genuine duplicate-key inserts and the check-then-insert race that produces the same error under concurrency. Does not cover foreign-key constraint failures (a different SQLITE_CONSTRAINT variant) or CHECK-constraint failures — those need a different diagnosis of the data itself, not of insert timing.",
+      "symptoms": [
+        "An INSERT throws D1_ERROR: UNIQUE constraint failed: <table>.<column>: SQLITE_CONSTRAINT",
+        "The same insert succeeds the first time and fails on a retry with the same data",
+        "The failure is intermittent and correlates with near-simultaneous requests for the same key"
+      ],
+      "signatures": [
+        {
+          "errorCode": "SQLITE_CONSTRAINT",
+          "normalisedMessage": "d1_error: unique constraint failed: sqlite_constraint",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["cloudflare-d1"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "INSERT throws UNIQUE constraint failed / SQLITE_CONSTRAINT",
+          "body": "A write to a table with a UNIQUE column or index (often the primary business key, like user_id or email) fails with D1_ERROR: UNIQUE constraint failed."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Confirm a row with that value already exists",
+          "body": "Query the table directly for the value that was rejected.",
+          "command": "SELECT * FROM subscriptions WHERE user_id = ?;",
+          "commandLanguage": "sql",
+          "expectedOutput": "A row is returned, showing the value is already present.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Treat the duplicate as an update, or ignore it deliberately",
+          "body": "If a duplicate for this key is a legitimate, expected case (e.g. re-running a signup flow), use SQLite's upsert syntax instead of a bare INSERT so the constraint stops being an error path at all.",
+          "command": "INSERT INTO subscriptions (user_id, plan) VALUES (?, ?)\nON CONFLICT(user_id) DO UPDATE SET plan = excluded.plan;",
+          "commandLanguage": "sql",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Changes the insert into an upsert: a new user_id is inserted as before, but an existing user_id now has its plan overwritten instead of throwing. Review whether overwrite is the behaviour you actually want before shipping this."
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check whether this is a check-then-insert race",
+          "body": "If a SELECT to check for an existing row ran immediately before the INSERT and found nothing, but the INSERT still failed, another request for the same key completed its own insert in between the two calls. D1 gives you no cross-request lock to make a check-then-insert pattern safe from that race.",
+          "command": "npx wrangler tail --format pretty",
+          "commandLanguage": "sh",
+          "expectedOutput": "Two near-simultaneous invocations for the same user_id, both passing their SELECT check, one losing the subsequent INSERT.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Stop pre-checking; let the constraint be the source of truth",
+          "body": "Remove the SELECT-then-INSERT pattern and attempt the INSERT directly, catching SQLITE_CONSTRAINT as your \"already exists\" signal. This is race-proof because SQLite enforces the constraint atomically at insert time, which a separate SELECT beforehand cannot be.",
+          "command": "try {\n  await env.DB.prepare(\"INSERT INTO subscriptions (user_id, plan) VALUES (?, ?)\").bind(userId, plan).run();\n} catch (err) {\n  if (String(err).includes(\"SQLITE_CONSTRAINT\")) {\n    // already exists — treat as success, or fetch and return the existing row\n  } else {\n    throw err;\n  }\n}",
+          "commandLanguage": "ts",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Changes error handling only: a duplicate insert now resolves gracefully instead of throwing an uncaught error to the caller. It does not change what gets written for a genuinely new row."
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Not a duplicate-row issue — escalate",
+          "body": "If no existing row matches and this isn't a check-then-insert race, look at the schema for an unintentionally narrow UNIQUE index — for example a compound key that's more restrictive than the application logic assumes."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Re-run the insert path against a duplicate value",
+          "body": "Send the same insert twice (or trigger the flow that previously raced) and confirm it no longer throws an uncaught error to the caller.",
+          "command": "curl -s -X POST https://your-worker.example.workers.dev/subscribe -d '{\"userId\":\"u_1\"}' & curl -s -X POST https://your-worker.example.workers.dev/subscribe -d '{\"userId\":\"u_1\"}' & wait",
+          "commandLanguage": "sh",
+          "expectedOutput": "Both requests return a normal response; neither surfaces an unhandled SQLITE_CONSTRAINT error.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "Duplicate inserts for the same key are now handled deliberately instead of throwing an unhandled error."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/d1/observability/debug-d1/",
+          "title": "Debug D1",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "d1-migration-not-applied-no-such-table",
+      "problemTitle": "D1 says a table doesn't exist even though a migration created it",
+      "problemSummary": "A query against D1 fails with \"no such table\" even though a migration that creates the table has been written and appears to have run, because it was applied to the wrong target (local vs remote) or against the wrong database.",
+      "title": "Fixing D1 \"no such table\" after a migration that seemed to run",
+      "summary": "Covers the two most common causes: applying a migration to the wrong local/remote target, and a Worker binding pointing at a different database_id than the one that was migrated. Does not cover a migration file that itself has a SQL error (that fails loudly at apply time, not later as \"no such table\"), or drift specifically caused by an ORM's own migration tracking — see the Drizzle-specific playbook for that.",
+      "symptoms": [
+        "A query fails with D1_ERROR: no such table: <table>, or SQLITE_ERROR: no such table",
+        "You're confident the migration file that creates the table exists and looks correct",
+        "The table shows up when queried against one environment (e.g. local) but not another (e.g. remote), or vice versa"
+      ],
+      "signatures": [
+        {
+          "errorCode": "SQLITE_ERROR",
+          "normalisedMessage": "d1_error: no such table",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["cloudflare-d1", "wrangler"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "D1 query fails with \"no such table\"",
+          "body": "A SELECT/INSERT/UPDATE against a table fails as if it were never created, despite a migration existing for it."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Check which database the migration actually ran against",
+          "body": "D1 local and remote are separate SQLite databases. `wrangler d1 migrations apply` needs an explicit `--local` or `--remote` flag, and running it once with one flag does not apply it to the other.",
+          "command": "npx wrangler d1 migrations list <DATABASE_NAME> --remote",
+          "commandLanguage": "sh",
+          "expectedOutput": "The migration you expect is listed under migrations still to be applied, rather than under already-applied ones.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Apply the migration to the target that's missing it",
+          "body": "Run migrations apply against whichever target the failing query is actually hitting — typically `--remote` for a deployed Worker, `--local` for `wrangler dev`.",
+          "command": "npx wrangler d1 migrations apply <DATABASE_NAME> --remote",
+          "commandLanguage": "sh",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Applies any pending .sql migration files to the remote D1 database, creating or altering tables as those files specify. It does not delete existing data unless a migration file itself contains a DROP or DELETE statement."
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check whether the binding points at a different database",
+          "body": "Confirm the `database_id` your deployed Worker is actually bound to matches the one you migrated — a stale `preview_database_id`, or a staging/production database_id mix-up in wrangler.jsonc, will produce exactly this symptom even after a correct migration run.",
+          "command": "npx wrangler d1 info <DATABASE_NAME>",
+          "commandLanguage": "sh",
+          "expectedOutput": "The database_id shown does not match the database_id in the d1_databases block your Worker is deployed with.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Point the binding at the correct database and redeploy",
+          "body": "Correct the `database_id` (and `preview_database_id` if relevant) in your Wrangler configuration to match the database that actually has the migration applied, then redeploy.",
+          "command": "npx wrangler deploy",
+          "commandLanguage": "sh",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Redeploys the Worker so it binds to the D1 database that has the migration applied. No data in either database is modified by this step."
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Not a target/binding mismatch — escalate",
+          "body": "If the migration is applied to the right database and the binding is correct, check whether `migrations_table` was customised away from the default and the table really was created but under a name or in a way you're not querying — or check the migration file itself for a typo in the table name."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Confirm the table exists where you're querying it",
+          "body": "List the tables directly against the same target (local/remote) your Worker queries at runtime.",
+          "command": "npx wrangler d1 execute <DATABASE_NAME> --remote --command \"SELECT name FROM sqlite_master WHERE type='table';\"",
+          "commandLanguage": "sh",
+          "expectedOutput": "The table you expected appears in the result set.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "The correct database has the migration applied and the Worker is bound to that database; the query now succeeds."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/d1/reference/migrations/",
+          "title": "Migrations",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/d1/best-practices/local-development/",
+          "title": "Local development",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "workers-error-1101-uncaught-exception",
+      "problemTitle": "Workers Error 1101: Worker threw a JavaScript exception",
+      "problemSummary": "A request to a Worker returns HTTP 500 with Cloudflare Error 1101, meaning the Worker's own code threw an uncaught JavaScript exception.",
+      "title": "Debugging Workers Error 1101 (uncaught exception)",
+      "summary": "Covers finding and fixing the underlying JavaScript exception behind Error 1101, including the \"script will never generate a response\" variant caused by an unresolved promise. Does not cover Error 1102 (CPU time limit exceeded — a resource limit, not a thrown exception) or Error 1015 (rate limiting) — those have separate, more specific causes and remedies.",
+      "symptoms": [
+        "Requests fail with HTTP 500 and Cloudflare Error 1101",
+        "wrangler tail or Workers Logs shows an Uncaught (in promise) or Uncaught TypeError line just before the failed request",
+        "The error is intermittent and tied to specific input shapes (e.g. a missing field, an empty body)"
+      ],
+      "signatures": [
+        {
+          "errorCode": "1101",
+          "normalisedMessage": "error 1101: worker threw exception",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["cloudflare-workers", "wrangler"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "Requests fail with Error 1101",
+          "body": "Cloudflare returns Error 1101 whenever a Worker's own JavaScript throws an uncaught exception. The 1101 page itself never says what threw — the real cause is always in your own logs."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Find the actual exception behind the 1101",
+          "body": "Tail the Worker's logs while reproducing the failing request and look for the exception that immediately precedes the 1101 outcome.",
+          "command": "npx wrangler tail --format pretty",
+          "commandLanguage": "sh",
+          "expectedOutput": "A line such as \"Uncaught TypeError: Cannot read properties of undefined (reading 'id')\" immediately before the request completes with a 500.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Fix the specific exception",
+          "body": "Address whatever the trace points at — commonly an undefined/null property access, `JSON.parse()` on an empty or malformed body, or an unhandled rejection from a downstream call. Add a guard or a try/catch with a deliberate error response instead of letting it throw uncaught.",
+          "command": "let body;\ntry {\n  body = await request.json();\n} catch {\n  return new Response(\"Invalid JSON body\", { status: 400 });\n}",
+          "commandLanguage": "ts",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check for the \"script will never generate a response\" variant",
+          "body": "Some 1101s show no normal stack trace because nothing actually threw — the Workers runtime detected that all code finished running but no Response was ever returned. This happens when a Promise you're awaiting never resolves or rejects, or a WebSocket is left open with nothing to close it.",
+          "command": "npx wrangler tail --format pretty",
+          "commandLanguage": "sh",
+          "expectedOutput": "A message containing \"The script will never generate a response\" rather than a specific exception.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Ensure every code path resolves a Response",
+          "body": "Find the Promise your handler depends on that can be left unresolved (a `setTimeout`-based promise with no fallback, an event listener that's never fired) and guarantee it resolves or rejects. Enabling the `no-floating-promises` ESLint rule catches most of these at review time.",
+          "command": "let { promise, resolve } = Promise.withResolvers();\nsetTimeout(resolve, 0); // ensure this always fires\nreturn promise.then(() => new Response(\"ok\"));",
+          "commandLanguage": "ts",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Not resolved by inspecting your own code — escalate",
+          "body": "If wrangler tail shows nothing useful in either form, this may be a Workers runtime issue rather than application code. Contact Cloudflare Support with the Ray ID from the error page, the Worker name, recent code changes, and steps to reproduce."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Redeploy and repeat the failing request",
+          "body": "Deploy the fix and re-send the request (or input) that previously triggered the 1101.",
+          "command": "npx wrangler deploy",
+          "commandLanguage": "sh",
+          "expectedOutput": "wrangler tail shows the expected status code with no exception, and no 1101.",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Deploys the corrected Worker code to production, replacing the currently live version."
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "The request path handles the previously-unhandled case and no longer throws an uncaught exception."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1101/",
+          "title": "Error 1101",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/workers/observability/errors/",
+          "title": "Errors",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "workers-cpu-time-limit-exceeded",
+      "problemTitle": "Worker exceeds CPU time limit in production but not locally",
+      "problemSummary": "A Worker request fails with Error 1102 / \"Worker exceeded resource limits\" in production, but the same request never times out under `wrangler dev`, because wrangler dev does not enforce the same CPU-time limit.",
+      "title": "Fixing Workers CPU time limit exceeded (Error 1102)",
+      "summary": "Covers genuine CPU-time exhaustion (heavy synchronous computation) and distinguishes it from a request that's merely slow because it's waiting on a subrequest — waiting time never counts toward CPU time, so that case needs a different fix entirely. Does not cover memory-limit resets (a different error, \"Exceeded Memory\") or the free-plan daily request cap (Error 1027).",
+      "symptoms": [
+        "Requests fail with Error 1102: Worker exceeded resource limits, only in production",
+        "wrangler dev reproduces the same logic without ever timing out",
+        "Workers metrics show \"Exceeded CPU Time Limits\" under Errors > Invocation Statuses"
+      ],
+      "signatures": [
+        {
+          "errorCode": "1102",
+          "normalisedMessage": "worker exceeded cpu time limit",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["cloudflare-workers", "wrangler"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "Worker times out only in production",
+          "body": "The Worker fails with Error 1102 in production while the same code path never times out locally under `wrangler dev`. CPU time (active execution) is capped by the platform; wrangler dev does not enforce that same cap, which is exactly why this only reproduces once deployed."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Confirm it's CPU time, not a request timeout",
+          "body": "Check the invocation outcome for this request. `exceededCpu` (Error 1102) means active CPU execution ran past the configured limit; anything else (a plain timeout or 524) is a different problem.",
+          "command": "npx wrangler tail --format json",
+          "commandLanguage": "sh",
+          "expectedOutput": "The trace event's outcome field is \"exceededCpu\".",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Profile the hot path and/or raise the CPU limit",
+          "body": "Use CPU profiling (DevTools via `wrangler dev --remote` or the dashboard) to find the expensive synchronous section — a large loop, heavy JSON processing, or a hashing/compression routine. Optimise it, and if the workload genuinely needs more headroom, raise the configured limit; Workers Paid supports up to 300,000 ms (5 minutes) per request, up from the 30-second default.",
+          "command": "{\n  \"limits\": {\n    \"cpu_ms\": 300000\n  }\n}",
+          "commandLanguage": "jsonc",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Raises the Worker's maximum CPU time per request from the default 30 seconds up to 300 seconds. It does not make inefficient code faster — it only gives it more room before being killed — and the higher value is only honoured on the Workers Paid plan."
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check whether it's actually a slow await, not CPU work",
+          "body": "Time spent waiting on a fetch(), D1 query, or KV read never counts toward CPU time — only active execution does. If the request is slow because it's waiting on a downstream call, raising cpu_ms will not help.",
+          "command": "npx wrangler tail --format json",
+          "commandLanguage": "sh",
+          "expectedOutput": "A large gap between wallTime and cpuTime in the trace event — most of the elapsed time was spent waiting, not computing.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "This is a latency problem, not a CPU-time problem",
+          "body": "The fix here is optimising or parallelising the slow downstream call (the D1/KV/fetch you're awaiting), or moving the work to a Durable Object/Queue for background processing — not raising cpu_ms, which only affects active computation and won't touch wait time.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Not resolved — escalate",
+          "body": "If neither profiling nor raising the limit clears exceededCpu, and it isn't a wait-time issue either, capture a CPU profile and the Ray ID and take it to Cloudflare Support."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Re-run the same production request path",
+          "body": "Repeat the request that previously failed and confirm the invocation outcome is no longer exceededCpu.",
+          "command": "npx wrangler tail --format json",
+          "commandLanguage": "sh",
+          "expectedOutput": "outcome: \"ok\" for the same request path.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "The request now completes within its CPU time budget."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/workers/platform/limits/",
+          "title": "Limits",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/changelog/post/2025-03-25-higher-cpu-limits/",
+          "title": "Run Workers for up to 5 minutes of CPU-time",
+          "type": "changelog",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "workers-io-object-different-request",
+      "problemTitle": "Cannot perform I/O on behalf of a different request",
+      "problemSummary": "A Worker throws \"Cannot perform I/O on behalf of a different request\" because a Request, Response, stream, or database client created during one invocation was cached at module scope and reused during a later, different invocation.",
+      "title": "Fixing \"Cannot perform I/O on behalf of a different request\"",
+      "summary": "Covers the module-level-caching anti-pattern for I/O objects (Request/Response/streams/database clients) in Workers. Does not cover the Cache API, which is the correct, supported way to cache actual HTTP responses across requests — this playbook is specifically about accidentally reusing the live object rather than its data.",
+      "symptoms": [
+        "Uncaught (in promise) Error: Cannot perform I/O on behalf of a different request",
+        "The error appears only on the second (or a later) request, never the first",
+        "A Response, Request, ReadableStream, or database client is assigned to a variable declared outside the fetch handler"
+      ],
+      "signatures": [
+        {
+          "errorCode": null,
+          "normalisedMessage": "cannot perform i/o on behalf of a different request. i/o objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler.",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["cloudflare-workers"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "Worker throws \"Cannot perform I/O on behalf of a different request\"",
+          "body": "Each Worker invocation has its own isolated execution context. Accessing a stream, Request, or Response body created in one invocation from a different invocation is disallowed and throws this error — it's the runtime protecting request isolation, not a transient failure."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Look for an I/O object cached at module scope",
+          "body": "Search for a Request, Response, ReadableStream, or similar object assigned to a variable declared outside the fetch handler, then read again on a later invocation.",
+          "command": "grep -n \"^let \\|^const \\|^var \" src/index.ts",
+          "commandLanguage": "sh",
+          "expectedOutput": "A top-level variable such as `let cachedResponse = null;` that gets assigned inside fetch() and read on a subsequent call.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Cache the data, not the I/O object",
+          "body": "Extract and store the plain data (a string, parsed JSON, an ArrayBuffer) instead of the live Response/Request/stream. Construct a fresh Response from that data on each invocation. If the goal is genuine HTTP response caching across requests, use the Cache API instead, which is designed for exactly that.",
+          "command": "let cachedData = null; // plain data, not a Response\n\nexport default {\n  async fetch(request, env, ctx) {\n    if (cachedData) return new Response(cachedData);\n    const res = await fetch(\"https://example.com/data\");\n    cachedData = await res.text();\n    return new Response(cachedData);\n  },\n};",
+          "commandLanguage": "ts",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check for a cached database/connection client",
+          "body": "The same error shows up when a database client — a Hyperdrive/pg connection, a driver instance — is created once at module scope and reused across invocations instead of being created fresh inside the handler.",
+          "command": "grep -n \"new Client\\|new Pool\\|connect(\" src/**/*.ts",
+          "commandLanguage": "sh",
+          "expectedOutput": "A client/connection constructed at module scope, outside fetch(), and reused across requests.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Create the client inside the handler, per request",
+          "body": "Move client construction inside the request handler so each invocation gets its own. Hyperdrive's connection pooling already removes the connection-startup cost this pattern was usually trying to avoid, so there's no performance reason to hand-roll caching here.",
+          "command": "export default {\n  async fetch(request, env) {\n    const client = new Client({ connectionString: env.HYPERDRIVE.connectionString });\n    await client.connect();\n    try {\n      return Response.json(await client.query(\"SELECT 1\"));\n    } finally {\n      ctx.waitUntil(client.end());\n    }\n  },\n};",
+          "commandLanguage": "ts",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "No cached I/O object found — escalate",
+          "body": "If nothing at module scope holds an I/O object, look for the same pattern one level removed — an object stored in a class instance that itself persists across invocations (e.g. attached to a Durable Object instance field, which does persist between requests to that object)."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Send two rapid successive requests",
+          "body": "Fire two requests back to back and confirm neither throws, and that the second reflects fresh data rather than a stale cached I/O object.",
+          "command": "curl -s https://your-worker.example.workers.dev/ && curl -s https://your-worker.example.workers.dev/",
+          "commandLanguage": "sh",
+          "expectedOutput": "Both requests return normally with no \"Cannot perform I/O\" error.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "I/O objects are now created fresh per invocation rather than shared across requests."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/workers/observability/errors/",
+          "title": "Errors",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/hyperdrive/observability/troubleshooting/",
+          "title": "Troubleshooting",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "r2-signaturedoesnotmatch-presigned-url",
+      "problemTitle": "R2 presigned URL fails with SignatureDoesNotMatch",
+      "problemSummary": "A request to an R2 presigned URL is rejected with a 403 and S3 error code SignatureDoesNotMatch, meaning the signature R2 calculated for the request doesn't match the one supplied in the URL.",
+      "title": "Fixing R2 SignatureDoesNotMatch on presigned URLs",
+      "summary": "Covers the URL being altered after signing (re-encoding, reordering, or stripping of query parameters) and signing with a stale or wrong secret key. Does not cover expired presigned URLs, which R2 reports as a separate error code, ExpiredRequest — check that first, since the fix is completely different (just regenerate the URL).",
+      "symptoms": [
+        "A PUT or GET against a presigned R2 URL returns 403 with <Code>SignatureDoesNotMatch</Code>",
+        "The same presigned URL worked when tested with curl right after generation, but fails when used by the actual client (browser, mobile app, email link)",
+        "The failure started right after rotating an R2 API token or secret access key"
+      ],
+      "signatures": [
+        {
+          "errorCode": "SignatureDoesNotMatch",
+          "normalisedMessage": "signaturedoesnotmatch: request signature we calculated does not match the signature you provided",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["cloudflare-r2"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "Presigned R2 URL fails with SignatureDoesNotMatch",
+          "body": "R2 returns HTTP 403 with S3 error code SignatureDoesNotMatch (R2 error code 10035): the request signature it calculated does not match the one in the URL. Note this is a different error code from ExpiredRequest (10018) — if the code is ExpiredRequest instead, the URL simply expired and needs regenerating; that's not what this playbook covers."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Check whether the URL was modified in transit",
+          "body": "Compare the exact URL you generated against the one the client actually requested. Proxies, chat apps generating link previews, email clients, and even some HTTP libraries can re-encode or reorder query parameters, which invalidates the signature since it covers the exact query string.",
+          "command": "diff <(echo \"$GENERATED_URL\") <(echo \"$RECEIVED_URL\")",
+          "commandLanguage": "sh",
+          "expectedOutput": "A difference in the query string — e.g. %2F decoded to /, or parameters in a different order — between the generated and received URLs.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Keep the URL byte-for-byte unmodified end-to-end",
+          "body": "Don't let anything between signing and use touch the URL — no manual re-encoding, no passing it through a query-string-stripping redirect or shortener. If it has to pass through infrastructure that might mangle it, sign it server-side immediately before handing it to the client rather than caching a previously-generated URL.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check whether the signing key still matches",
+          "body": "Confirm the access key ID / secret access key your Worker is signing with is the one currently active for that R2 API token — a rotated secret or a mismatched key pair (from a different token) produces exactly this error.",
+          "command": "npx wrangler secret list",
+          "commandLanguage": "sh",
+          "expectedOutput": "The secret last updated around the same time signing started failing, or a key pair that doesn't correspond to an active R2 API token in the dashboard.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Update the secret used for signing",
+          "body": "Set the current, active secret access key as the Worker secret, and make sure both the access key ID and secret access key you construct AwsClient/S3Client with come from the same, current R2 API token.",
+          "command": "npx wrangler secret put R2_SECRET_ACCESS_KEY",
+          "commandLanguage": "sh",
+          "safetyLevel": "credential_sensitive",
+          "safetyEffect": "Replaces the secret value used to sign new presigned URLs. Any presigned URL already issued under the old secret stops validating as soon as this deploys, so links already sent to users may break before they're used."
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Not a URL-mangling or key-rotation issue — escalate",
+          "body": "Check whether a header included in signing (most commonly Content-Type) doesn't match what the actual request sends — R2's presigned signature covers whichever headers were included at sign time, and a client sending a different Content-Type than the one signed will also produce SignatureDoesNotMatch."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Generate a fresh URL and use it immediately, unmodified",
+          "body": "Generate a new presigned URL and request it right away with curl, without passing it through anything that might alter it.",
+          "command": "curl -X PUT \"$FRESH_PRESIGNED_URL\" --data-binary @test-file",
+          "commandLanguage": "sh",
+          "expectedOutput": "A 200 (or 2xx) response, with no SignatureDoesNotMatch.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "The presigned URL now validates because it reaches R2 unmodified and is signed with the current key."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/r2/api/error-codes/",
+          "title": "Error codes",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/r2/objects/upload-objects/",
+          "title": "Upload objects",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "do-storage-operation-timeout",
+      "problemTitle": "Durable Object storage operation exceeded timeout",
+      "problemSummary": "A Durable Object's storage operation fails and the object resets because the write took too long, typically from a single oversized value or from wrapping too much slow work in blockConcurrencyWhile().",
+      "title": "Fixing Durable Object storage operation timeouts",
+      "summary": "Covers oversized single writes and misuse of blockConcurrencyWhile() as the two most common causes of a Durable Object storage timeout. Does not cover the equivalent, differently-worded timeout message that D1 itself surfaces (D1 runs on Durable Objects internally, but its error text and remediation — sharding queries, not blockConcurrencyWhile — are D1-specific, not this playbook).",
+      "symptoms": [
+        "A Durable Object method fails with an error mentioning storage operation exceeded timeout, and the object appears to reset (in-memory state is lost)",
+        "The failure correlates with writing an unusually large value in one call",
+        "The failure happens inside or right after a blockConcurrencyWhile() call"
+      ],
+      "signatures": [
+        {
+          "errorCode": null,
+          "normalisedMessage": "durable object storage operation exceeded timeout",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["cloudflare-durable-objects"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "Durable Object storage operation exceeded timeout",
+          "body": "A `ctx.storage` write inside a Durable Object fails and the object resets — any in-memory state is lost, and in-flight requests that were touching storage are cut off."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Check the size of the value being written",
+          "body": "Log the size of whatever is being passed to the failing storage call — a single oversized put() (a big JSON blob, base64-encoded file, or an entire accumulated history) is the most common cause.",
+          "command": "console.log(\"write size:\", JSON.stringify(value).length);",
+          "commandLanguage": "ts",
+          "expectedOutput": "A value size in the hundreds of KB to multiple MB, written in a single storage call.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Shard the large value, or move it out of Durable Object storage",
+          "body": "Split the oversized value into smaller keys/rows written separately (using the SQL API if this is a SQLite-backed Durable Object), or store the bulk data in R2 and keep only a reference to it in the Durable Object.",
+          "command": "// Instead of one large blob:\n// await ctx.storage.put(\"history\", hugeArray);\n\n// Store rows individually via the SQL API:\nfor (const entry of hugeArray) {\n  ctx.storage.sql.exec(\n    \"INSERT INTO history (ts, payload) VALUES (?, ?)\",\n    entry.ts,\n    JSON.stringify(entry.payload)\n  );\n}",
+          "commandLanguage": "ts",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Changes how the same data is stored (many small rows instead of one large value) — it does not change the data itself. Existing large values already written under the old key are not migrated automatically."
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check for blockConcurrencyWhile() wrapping slow work",
+          "body": "`blockConcurrencyWhile()` blocks all concurrency for the object unconditionally and is intended for one-time initialisation, not regular request handling. Using it around a slow or chained set of storage operations on every request can push a single call past the timeout.",
+          "command": "grep -n \"blockConcurrencyWhile\" src/**/*.ts",
+          "commandLanguage": "sh",
+          "expectedOutput": "blockConcurrencyWhile() called on the normal request-handling path, not just in the constructor.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Stop using blockConcurrencyWhile() outside initialization",
+          "body": "Reserve `blockConcurrencyWhile()` for one-time setup (e.g. creating tables). For regular request handling, rely on the Durable Object runtime's input/output gates — they already serialize storage access safely without blocking unrelated requests — and use `transaction()` for atomic read-modify-write operations instead.",
+          "command": "// ✅ Good: no blockConcurrencyWhile on the hot path\nasync sendMessage(content) {\n  this.ctx.storage.sql.exec(\"INSERT INTO messages (content) VALUES (?)\", content);\n  // Output gate holds the response until this write completes.\n}",
+          "commandLanguage": "ts",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Not a size or blockConcurrencyWhile issue — escalate",
+          "body": "If neither applies, check for many unrelated storage operations chained inside one request with no batching — the same category of problem as an oversized single write, just spread across several calls instead of one."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Repeat the action that triggered the timeout",
+          "body": "Re-run the same request/operation and confirm the write completes without the object resetting.",
+          "command": "npx wrangler tail --format pretty",
+          "commandLanguage": "sh",
+          "expectedOutput": "No repeat of the storage operation exceeded timeout error in the trace for this request.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "Storage writes now complete within the timeout and the object no longer resets under this workload."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/",
+          "title": "Rules of Durable Objects",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/durable-objects/best-practices/access-durable-objects-storage/",
+          "title": "Access Durable Objects storage",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "do-reset-code-update-websocket-drop",
+      "problemTitle": "Durable Object WebSocket disconnects on every deploy",
+      "problemSummary": "WebSocket connections to a Durable Object drop every time a new Worker version is deployed, because deploying restarts every instance of the updated Durable Object class and terminates its open connections.",
+      "title": "Handling Durable Object WebSocket disconnects on deploy",
+      "summary": "Covers the expected, documented behaviour that a code update terminates a Durable Object's WebSockets, and gradual deployments extending the window this can happen in. Does not cover WebSocket drops unrelated to deploys (idle timeouts, client network loss, or missing ping/pong handling) — rule those out first if the disconnects don't line up with a deploy.",
+      "symptoms": [
+        "Clients connected via WebSocket to a Durable Object get disconnected every time `wrangler deploy` runs",
+        "There's no error on the client beyond a closed connection — no exception, no 1101",
+        "Reconnecting immediately after works fine until the next deploy"
+      ],
+      "signatures": [
+        {
+          "errorCode": null,
+          "normalisedMessage": "durable object reset because its code was updated",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["cloudflare-durable-objects", "cloudflare-workers"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "Durable Object WebSocket disconnects on deploy",
+          "body": "Every WebSocket connected to a Durable Object closes when that Durable Object's code is updated, because Cloudflare restarts the object to run the new code."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Confirm disconnects line up with deploys",
+          "body": "Compare deployment timestamps against WebSocket close events to rule out an unrelated cause (idle timeout, client network loss).",
+          "command": "npx wrangler deployments list",
+          "commandLanguage": "sh",
+          "expectedOutput": "WebSocket close events cluster within seconds of a deployment timestamp.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "test",
+          "title": "Check whether gradual deployments are enabled",
+          "body": "With gradual deployments, traffic is split across old and new Worker versions over an extended rollout window. A Durable Object can be restarted more than once during that window as traffic shifts, and a request on the new version can reach a Durable Object still momentarily running the old one.",
+          "command": "npx wrangler deployments list",
+          "commandLanguage": "sh",
+          "expectedOutput": "A deployment showing a percentage rollout (e.g. 10% → 100% over time) rather than an instant 100% cutover.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n4",
+          "type": "fix",
+          "title": "Keep Worker/Durable Object API forward- and backward-compatible during rollout",
+          "body": "During a gradual deployment, code changes are released globally in an eventually-consistent manner, so a request can hit the new Worker version while its Durable Object is still on the old one for a short period. Ensure the RPC/API surface between them is compatible in both directions for the duration of the rollout, in addition to adding client reconnect logic.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Add automatic client reconnect logic",
+          "body": "A code-update-triggered disconnect is expected platform behaviour, not a bug to eliminate. Design the client to detect the close and reconnect automatically (with backoff), and use the Hibernation API (`server.accept()`) so the Durable Object itself doesn't need to hold the connection object in memory between messages — that reduces unrelated evictions, though it does not prevent a disconnect caused by an actual code update.",
+          "command": "function connect() {\n  const ws = new WebSocket(\"wss://your-worker.example.workers.dev/room\");\n  ws.addEventListener(\"close\", () => {\n    setTimeout(connect, 1000 + Math.random() * 1000);\n  });\n  return ws;\n}",
+          "commandLanguage": "ts",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Disconnects don't line up with deploys — escalate",
+          "body": "If the timing doesn't correlate with deployments, look at idle timeouts, missing ping/pong keep-alive handling, or client-side network conditions instead — this playbook only covers the deploy-triggered reset."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Deploy again and observe reconnect behaviour",
+          "body": "Deploy with the reconnect logic in place and confirm connected clients reconnect within your expected window instead of the application breaking.",
+          "command": "npx wrangler deploy",
+          "commandLanguage": "sh",
+          "expectedOutput": "Clients briefly disconnect and reconnect automatically within a second or two of the deploy, with no application-level errors.",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Deploys the new Worker/Durable Object code to production, which will itself trigger the same reset being tested for."
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "Clients now recover automatically from the disconnect that deploys inherently cause."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n6", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n3", "to": "n4", "condition": "passed" },
+        { "from": "n3", "to": "n5", "condition": "failed" },
+        { "from": "n3", "to": "n5", "condition": "unknown" },
+        { "from": "n4", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/durable-objects/concepts/durable-object-lifecycle/",
+          "title": "Durable Object lifecycle",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/durable-objects/best-practices/websockets/",
+          "title": "WebSockets",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/durable-objects/platform/known-issues/",
+          "title": "Known issues",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "wrangler-d1-execute-remote-hangs",
+      "problemTitle": "wrangler d1 execute --remote hangs with no output",
+      "problemSummary": "Running `wrangler d1 execute --remote` (directly or via --file) appears to hang indefinitely with no output, most often because it's waiting on an interactive confirmation prompt that a non-interactive shell can never answer.",
+      "title": "Fixing wrangler d1 execute --remote hanging with no output",
+      "summary": "Covers the interactive-confirmation-prompt cause (the most common one, especially in CI or piped/backgrounded shells) and network connectivity to the Cloudflare API as a secondary cause. Does not cover a command that's genuinely still running against a very large file — check for real progress (network/CPU activity) before assuming it's stuck.",
+      "symptoms": [
+        "wrangler d1 execute <db> --remote --file=... prints nothing and never returns",
+        "The same command works fine when run directly in an interactive terminal",
+        "It hangs specifically in CI, inside a script, or when the output is piped/redirected"
+      ],
+      "signatures": [
+        {
+          "errorCode": null,
+          "normalisedMessage": "wrangler d1 execute --remote hangs with no output",
+          "languageHint": "sh",
+          "runtimeHint": null
+        }
+      ],
+      "technologies": ["wrangler", "cloudflare-d1"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "wrangler d1 execute --remote hangs with no output",
+          "body": "The command starts and never finishes — no error, no result, no progress output."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Check whether it's waiting on a confirmation prompt",
+          "body": "Several `wrangler d1` operations against the remote database print a confirmation prompt before running. If stdin isn't an interactive TTY — a CI job, a script, a piped command, a backgrounded process — that prompt can never be answered and the process just sits there indefinitely.",
+          "command": "npx wrangler d1 execute <DATABASE_NAME> --remote --file=./schema.sql",
+          "commandLanguage": "sh",
+          "expectedOutput": "A line similar to \"About to run the following queries on the remote database ... Ok to proceed? (y/N)\" appears and waits for a keypress, when run directly in an interactive terminal.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Pass --yes to skip the confirmation prompt",
+          "body": "Add `--yes` (or `-y`) so wrangler runs without waiting for interactive confirmation — required for CI, scripts, and any non-interactive invocation.",
+          "command": "npx wrangler d1 execute <DATABASE_NAME> --remote --file=./schema.sql --yes",
+          "commandLanguage": "sh",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Skips wrangler's interactive confirmation and runs the given queries directly against the remote D1 database. There is no prompt to catch a mistake, so double-check the file or command before adding --yes, especially for destructive SQL."
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check network connectivity to the Cloudflare API",
+          "body": "If the prompt genuinely isn't the cause (it hangs even run interactively), a corporate proxy, VPN, or firewall silently dropping the HTTPS connection to Cloudflare's API produces the same no-output hang.",
+          "command": "curl -v https://api.cloudflare.com/client/v4/user/tokens/verify -H \"Authorization: Bearer $CLOUDFLARE_API_TOKEN\"",
+          "commandLanguage": "sh",
+          "expectedOutput": "The curl request itself hangs or times out, rather than returning a JSON response (success or auth error).",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Fix the network path to Cloudflare's API",
+          "body": "Configure the proxy environment variables wrangler needs (e.g. HTTPS_PROXY), or run from a network/CI runner that isn't blocking outbound HTTPS to api.cloudflare.com.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Not a prompt or network issue — escalate",
+          "body": "Check whether the file being executed is unusually large. wrangler batches statements from a large --file and can look hung while genuinely still working — check for ongoing CPU/network activity on the process before concluding it's stuck, and consider splitting a very large file into smaller batches."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Re-run the original command",
+          "body": "Run the same command that previously hung and confirm it completes.",
+          "command": "npx wrangler d1 execute <DATABASE_NAME> --remote --file=./schema.sql --yes",
+          "commandLanguage": "sh",
+          "expectedOutput": "A result summary (rows affected, or query output) prints and the command returns.",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Executes the file's SQL statements against the remote D1 database."
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "The command now completes instead of hanging."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/workers/wrangler/commands/d1/",
+          "title": "Wrangler commands: d1",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    },
+    {
+      "slug": "drizzle-error-invalid-schema-migration",
+      "problemTitle": "DrizzleError: column does not exist after a migration",
+      "problemSummary": "A Drizzle query against D1 throws DrizzleError because a column or table the schema.ts model expects doesn't exist yet in the database being queried, typically because the migration adding it was never generated, or was applied to only one of D1's local/remote targets.",
+      "title": "Fixing DrizzleError from a missing column or table on D1",
+      "summary": "Covers schema.ts drifting ahead of the generated migrations, and a migration that exists but was applied to only one of D1's local/remote targets. Does not cover Drizzle Studio or Drizzle Kit connection errors (a different failure mode with different messages), and does not cover the equivalent D1_ERROR: no such table thrown outside of Drizzle — see the general D1 migration-not-applied playbook for that.",
+      "symptoms": [
+        "A Drizzle query throws DrizzleError: Column \"<col>\" does not exist in table \"<table>\"",
+        "The failure appears right after a schema.ts change that was believed to be migrated",
+        "The same query works against one D1 target (e.g. local) but not the other (e.g. remote)"
+      ],
+      "signatures": [
+        {
+          "errorCode": "DrizzleError",
+          "normalisedMessage": "drizzleerror: column does not exist in table",
+          "languageHint": "typescript",
+          "runtimeHint": "workers"
+        }
+      ],
+      "technologies": ["drizzle-orm", "cloudflare-d1"],
+      "nodes": [
+        {
+          "id": "n1",
+          "type": "start",
+          "title": "DrizzleError: column/table does not exist",
+          "body": "A query built from a Drizzle schema fails because the underlying D1 database doesn't actually have the column or table the schema.ts model describes."
+        },
+        {
+          "id": "n2",
+          "type": "test",
+          "title": "Check whether a migration for this change was ever generated",
+          "body": "Confirm `drizzle-kit generate` was run after the schema.ts change that added this column/table — editing schema.ts alone does not touch the database; Drizzle only produces SQL when you explicitly generate a migration from the diff.",
+          "command": "grep -rl \"<column_or_table_name>\" drizzle/*.sql",
+          "commandLanguage": "sh",
+          "expectedOutput": "No migration file mentions the column/table — schema.ts and the migrations folder have drifted apart.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n3",
+          "type": "fix",
+          "title": "Generate and apply the missing migration",
+          "body": "Generate a migration from the current schema.ts, then apply it to the target that's failing.",
+          "command": "npx drizzle-kit generate\nnpx wrangler d1 migrations apply <DATABASE_NAME> --remote",
+          "commandLanguage": "sh",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Creates a new .sql migration reflecting the current schema.ts and applies it to the remote D1 database, adding the missing column/table. Existing rows keep their data; only the schema changes."
+        },
+        {
+          "id": "n4",
+          "type": "test",
+          "title": "Check whether the migration exists but wasn't applied to this target",
+          "body": "D1 keeps separate local and remote databases, and each needs its own `wrangler d1 migrations apply` run. A migration generated and applied locally during development is not automatically applied to the remote database used in production, or vice versa.",
+          "command": "npx wrangler d1 migrations list <DATABASE_NAME> --remote",
+          "commandLanguage": "sh",
+          "expectedOutput": "The migration that adds the column/table is listed as not yet applied for this target.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n5",
+          "type": "fix",
+          "title": "Apply the pending migration to the failing target",
+          "body": "Run migrations apply against whichever target (local or remote) is missing it — run both if both need it, since they're independent.",
+          "command": "npx wrangler d1 migrations apply <DATABASE_NAME> --local\nnpx wrangler d1 migrations apply <DATABASE_NAME> --remote",
+          "commandLanguage": "sh",
+          "safetyLevel": "state_changing",
+          "safetyEffect": "Applies any migrations D1 hasn't recorded yet, separately for each target given. Already-applied migrations and existing data are untouched."
+        },
+        {
+          "id": "n6",
+          "type": "terminal",
+          "title": "Migration exists and is applied — escalate",
+          "body": "Check that `migrations_pattern`/`migrations_dir` in your Wrangler configuration actually match where drizzle-kit writes its output. A mismatch means `wrangler d1 migrations apply` silently finds nothing new to apply, even though drizzle-kit did generate a file — this is common when Drizzle's default output layout doesn't match wrangler's default `migrations/*.sql` glob."
+        },
+        {
+          "id": "n7",
+          "type": "verification",
+          "title": "Confirm the column exists, then re-run the query",
+          "body": "Check the table schema directly against the target that was failing, then repeat the Drizzle query that threw.",
+          "command": "npx wrangler d1 execute <DATABASE_NAME> --remote --command \"PRAGMA table_info(orders);\"",
+          "commandLanguage": "sh",
+          "expectedOutput": "The column/table is listed, and the Drizzle query that previously threw now returns normally.",
+          "safetyLevel": "informational",
+          "safetyEffect": null
+        },
+        {
+          "id": "n8",
+          "type": "terminal",
+          "title": "Resolved",
+          "body": "The database schema now matches schema.ts on the target that was failing."
+        }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n3", "condition": "unknown" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n6", "condition": "failed" },
+        { "from": "n4", "to": "n6", "condition": "unknown" },
+        { "from": "n3", "to": "n7", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n6", "condition": "failed" },
+        { "from": "n7", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        {
+          "url": "https://developers.cloudflare.com/d1/reference/migrations/",
+          "title": "Migrations",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        },
+        {
+          "url": "https://developers.cloudflare.com/workers/wrangler/configuration/",
+          "title": "Configuration",
+          "type": "official_docs",
+          "publisher": "Cloudflare"
+        }
+      ]
+    }
+  ]
+}

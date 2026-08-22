@@ -1,0 +1,743 @@
+{
+  "$comment": "DevYou search relevance benchmark — labelled query set. See README.md in this directory for how to run it, how to add a query, and what the acceptance targets are and where they come from. shape is the QueryShape (packages/search/src/query.ts) that packages/search/src/normalise.ts actually assigns to text on classification — every value below was verified against the real normaliseQuery() output, not asserted by hand. category is a coverage label only (exact_error, stack_trace, log, code_fragment, version_rich, natural_language, adversarial, zero_result), matching IMPLEMENTATION.md sec7 and RESEARCH-CONSTRAINTS.md R-22; it is not consumed by evaluate.ts. relevantProblemSlugs are kebab-case slugs invented for this benchmark and matched against the seed corpus once it exists (see README.md for the full list). Queries that share a slug describe the same underlying problem pasted in different shapes, deliberately, to test that retrieval finds it regardless of presentation.",
+  "queries": [
+    {
+      "id": "q001",
+      "category": "exact_error",
+      "shape": "exact_error",
+      "text": "SQLITE_BUSY: database is locked",
+      "relevantProblemSlugs": [
+        "d1-sqlite-busy-concurrent-writes"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-d1"
+      ],
+      "notes": "The single most common D1 error under concurrent writes."
+    },
+    {
+      "id": "q002",
+      "category": "exact_error",
+      "shape": "exact_error",
+      "text": "ECONNREFUSED 127.0.0.1:5432",
+      "relevantProblemSlugs": [
+        "node-econnrefused-service-unavailable"
+      ],
+      "expectedTechnologies": [
+        "nodejs"
+      ],
+      "notes": "Bare Node error code with a port, no prose."
+    },
+    {
+      "id": "q003",
+      "category": "exact_error",
+      "shape": "natural_language",
+      "text": "CrashLoopBackOff",
+      "relevantProblemSlugs": [
+        "k8s-crashloopbackoff-generic"
+      ],
+      "expectedTechnologies": [
+        "kubernetes"
+      ],
+      "notes": "The single token most people paste into a search box for this."
+    },
+    {
+      "id": "q004",
+      "category": "exact_error",
+      "shape": "exact_error",
+      "text": "SQLSTATE 40001",
+      "relevantProblemSlugs": [
+        "postgres-sqlstate-40001-serialization-failure"
+      ],
+      "expectedTechnologies": [
+        "postgresql"
+      ],
+      "notes": "Bare SQLSTATE code, no message."
+    },
+    {
+      "id": "q005",
+      "category": "exact_error",
+      "shape": "natural_language",
+      "text": "OOMKilled",
+      "relevantProblemSlugs": [
+        "k8s-oomkilled-memory-limit"
+      ],
+      "expectedTechnologies": [
+        "kubernetes"
+      ],
+      "notes": "Pasted straight from kubectl get pod output."
+    },
+    {
+      "id": "q006",
+      "category": "exact_error",
+      "shape": "exact_error",
+      "text": "D1_ERROR: too many API requests by single worker invocation",
+      "relevantProblemSlugs": [
+        "d1-too-many-subrequests-single-invocation"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-d1"
+      ],
+      "notes": "Exact D1 subrequest-limit error text."
+    },
+    {
+      "id": "q007",
+      "category": "exact_error",
+      "shape": "mixed",
+      "text": "PrismaClientInitializationError",
+      "relevantProblemSlugs": [
+        "prisma-client-initialization-error-connection-string"
+      ],
+      "expectedTechnologies": [
+        "prisma"
+      ],
+      "notes": "Bare exception class name, no message body."
+    },
+    {
+      "id": "q008",
+      "category": "exact_error",
+      "shape": "natural_language",
+      "text": "SignatureDoesNotMatch",
+      "relevantProblemSlugs": [
+        "r2-signaturedoesnotmatch-presigned-url"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-r2"
+      ],
+      "notes": "Single S3-compatible error token as returned by R2."
+    },
+    {
+      "id": "q009",
+      "category": "exact_error",
+      "shape": "natural_language",
+      "text": "ImagePullBackOff",
+      "relevantProblemSlugs": [
+        "k8s-imagepullbackoff-private-registry"
+      ],
+      "expectedTechnologies": [
+        "kubernetes"
+      ],
+      "notes": "Bare pod status, the phrase most commonly pasted verbatim."
+    },
+    {
+      "id": "q010",
+      "category": "exact_error",
+      "shape": "natural_language",
+      "text": "SERVFAIL",
+      "relevantProblemSlugs": [
+        "coredns-servfail-loop-detected"
+      ],
+      "expectedTechnologies": [
+        "coredns"
+      ],
+      "notes": "Bare DNS response code."
+    },
+    {
+      "id": "q011",
+      "category": "stack_trace",
+      "shape": "stack_trace",
+      "text": "TypeError: D1_ERROR: database is locked: SQLITE_BUSY\n    at Object.execute (/home/alice/app/src/db.ts:41:19)\n    at handleWrite (/home/alice/app/src/routes/orders.ts:88:11)\n    at Object.fetch (/home/alice/app/src/index.ts:15:5)",
+      "relevantProblemSlugs": [
+        "d1-sqlite-busy-concurrent-writes"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-d1",
+        "cloudflare-workers"
+      ],
+      "notes": "Same underlying problem as q001, wrapped in a Worker stack trace with an alice/home path — tests that fingerprinting matches across a completely different developer's machine."
+    },
+    {
+      "id": "q012",
+      "category": "stack_trace",
+      "shape": "stack_trace",
+      "text": "Traceback (most recent call last):\n  File \"/home/deploy/services/api/db/pool.py\", line 63, in get_connection\n    conn = self._pool.getconn()\n  File \"/home/deploy/services/api/db/pool.py\", line 40, in getconn\n    raise PoolError(\"too many clients already\")\npsycopg2.OperationalError: FATAL:  sorry, too many clients already",
+      "relevantProblemSlugs": [
+        "postgres-too-many-clients-connection-pool-exhausted"
+      ],
+      "expectedTechnologies": [
+        "postgresql"
+      ],
+      "notes": "Python traceback, different path shape (deploy/services) and a different client library than q014/q034."
+    },
+    {
+      "id": "q013",
+      "category": "stack_trace",
+      "shape": "stack_trace",
+      "text": "Exception in thread \"main\" java.lang.OutOfMemoryError: Java heap space\n    at com.example.worker.PlaybookIndexer.process(PlaybookIndexer.java:212)\n    at com.example.worker.PlaybookIndexer.run(PlaybookIndexer.java:88)\n    at java.base/java.lang.Thread.run(Thread.java:840)",
+      "relevantProblemSlugs": [
+        "k8s-oomkilled-memory-limit"
+      ],
+      "expectedTechnologies": [
+        "kubernetes"
+      ],
+      "notes": "Java heap OOM inside a container hitting the pod memory limit — same root cause as q005/q055 in a completely different language's trace shape."
+    },
+    {
+      "id": "q014",
+      "category": "stack_trace",
+      "shape": "stack_trace",
+      "text": "Error: timeout exceeded when trying to connect\n    at Connection.connect (/Users/bob/work/api/src/db.ts:57:13)\n    at Pool.connect (/Users/bob/work/api/node_modules/pg/lib/pool.js:45:8)\n    at handler (/Users/bob/work/api/src/routes/health.ts:12:3)",
+      "relevantProblemSlugs": [
+        "node-pg-connect-timeout-pool-exhausted"
+      ],
+      "expectedTechnologies": [
+        "node-postgres"
+      ],
+      "notes": "macOS-shaped path (Users/bob), node-postgres pool connect timeout at startup."
+    },
+    {
+      "id": "q015",
+      "category": "stack_trace",
+      "shape": "stack_trace",
+      "text": "PrismaClientInitializationError: Can't reach database server at `db.internal:5432`\n    at RequestHandler.request (/var/www/app/node_modules/@prisma/client/runtime/library.js:122:15)\n    at PrismaClient._executeRequest (/var/www/app/node_modules/@prisma/client/runtime/library.js:98:9)\n    at main (/var/www/app/src/index.ts:9:3)",
+      "relevantProblemSlugs": [
+        "prisma-p1001-cant-reach-database-server"
+      ],
+      "expectedTechnologies": [
+        "prisma"
+      ],
+      "notes": "Deployment-server path (var/www), distinct from q007's bare exception name for the same class."
+    },
+    {
+      "id": "q016",
+      "category": "stack_trace",
+      "shape": "stack_trace",
+      "text": "DrizzleError: Column \"status\" does not exist in table \"orders\"\n    at applyMigration (/home/runner/work/app/app/drizzle/migrate.ts:34:11)\n    at main (/home/runner/work/app/app/drizzle/migrate.ts:52:5)\n    at Object.<anonymous> (/home/runner/work/app/app/drizzle/migrate.ts:60:1)",
+      "relevantProblemSlugs": [
+        "drizzle-error-invalid-schema-migration"
+      ],
+      "expectedTechnologies": [
+        "drizzle-orm"
+      ],
+      "notes": "CI runner path (GitHub Actions style home/runner/work), pairs with the q031 code fragment for the same problem."
+    },
+    {
+      "id": "q017",
+      "category": "stack_trace",
+      "shape": "stack_trace",
+      "text": "Error: listen EADDRINUSE: address already in use :::8787\n    at Server.setupListenHandle (node:net:1899:16)\n    at listenInCluster (node:net:1955:12)\n    at Server.listen (D:\\projects\\worker\\src\\server.ts:24:9)",
+      "relevantProblemSlugs": [
+        "node-eaddrinuse-port-in-use"
+      ],
+      "expectedTechnologies": [
+        "nodejs"
+      ],
+      "notes": "Windows absolute path, exercises the windows-path normalisation rule specifically."
+    },
+    {
+      "id": "q018",
+      "category": "stack_trace",
+      "shape": "stack_trace",
+      "text": "Error: Durable Object storage operation exceeded timeout\n    at SessionDO.fetch (/opt/build/src/do/session.ts:88:13)\n    at SessionDO.handleJoin (/opt/build/src/do/session.ts:120:9)\n    at Object.fetch (/opt/build/src/index.ts:22:5)",
+      "relevantProblemSlugs": [
+        "do-storage-operation-timeout"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-durable-objects"
+      ],
+      "notes": "CI/build-server path (opt/build), fourth distinct path shape in this set."
+    },
+    {
+      "id": "q019",
+      "category": "log",
+      "shape": "log",
+      "text": "2026-08-15T09:12:03Z  Warning  BackOff    kubelet  Back-off restarting failed container\n2026-08-15T09:12:03Z  Warning  Unhealthy  kubelet  Liveness probe failed: HTTP probe failed with statuscode: 500\n2026-08-15T09:11:58Z  Normal   Pulled     kubelet  Container image already present on machine\n2026-08-15T09:11:40Z  Normal   Started    kubelet  Started container app\nStatus: CrashLoopBackOff",
+      "relevantProblemSlugs": [
+        "k8s-crashloopbackoff-generic"
+      ],
+      "expectedTechnologies": [
+        "kubernetes"
+      ],
+      "notes": "kubectl describe pod Events extract — same problem as q003's bare token, tests log-shaped retrieval of it."
+    },
+    {
+      "id": "q020",
+      "category": "log",
+      "shape": "log",
+      "text": "2026-08-11T07:22:10.884211Z time=\"2026-08-11T07:22:10Z\" level=warning msg=\"could not change group /var/run/docker.sock to docker\"\n2026-08-11T07:22:10.902344Z time=\"2026-08-11T07:22:10Z\" level=info msg=\"Starting up\"\n2026-08-11T07:22:11.015532Z time=\"2026-08-11T07:22:11Z\" level=error msg=\"Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\"\n2026-08-11T07:22:11.015700Z time=\"2026-08-11T07:22:11Z\" level=fatal msg=\"exiting\"",
+      "relevantProblemSlugs": [
+        "docker-cannot-connect-daemon"
+      ],
+      "expectedTechnologies": [
+        "docker"
+      ],
+      "notes": "Docker daemon startup log, JSON-ish structured lines."
+    },
+    {
+      "id": "q021",
+      "category": "log",
+      "shape": "log",
+      "text": "2026-08-09 03:14:02.881 UTC [21044] ERROR:  deadlock detected\n2026-08-09 03:14:02.881 UTC [21044] DETAIL:  Process 21044 waits for ShareLock on transaction 88213; blocked by process 21099.\n2026-08-09 03:14:02.881 UTC [21044] HINT:  See server log for query details.\n2026-08-09 03:14:02.881 UTC [21044] STATEMENT:  UPDATE accounts SET balance = balance - 100 WHERE id = $1\n2026-08-09 03:14:02.882 UTC [21044] CONTEXT:  while updating tuple (0,7) in relation \"accounts\"",
+      "relevantProblemSlugs": [
+        "postgres-deadlock-detected-40p01"
+      ],
+      "expectedTechnologies": [
+        "postgresql"
+      ],
+      "notes": "Standard postgres log_line_prefix output with PID, distinct from the serialization-failure query."
+    },
+    {
+      "id": "q022",
+      "category": "log",
+      "shape": "log",
+      "text": "2026-08-13 16:02:44.111 [3312] LOG stats: 0 xacts/s, 0 queries/s, in 0 B/s, out 0 B/s, xact 0 ns, query 0 ns, wait 0 ns\n2026-08-13 16:02:51.402 [3312] WARNING C-0x7f2a1c0: mydb/appuser@10.0.4.12:51422 pooler error: no more connections allowed (max_client_conn)\n2026-08-13 16:02:51.403 [3312] LOG C-0x7f2a1c0: mydb/appuser@10.0.4.12:51422 closing because: no more connections allowed (max_client_conn) (age=0s)\n2026-08-13 16:02:51.403 [3312] WARNING client connect failed: no more connections allowed (max_client_conn)",
+      "relevantProblemSlugs": [
+        "pgbouncer-max-client-conn-exceeded"
+      ],
+      "expectedTechnologies": [
+        "pgbouncer"
+      ],
+      "notes": "PgBouncer log with client IPs and a PID, repeated error line the way it actually floods."
+    },
+    {
+      "id": "q023",
+      "category": "log",
+      "shape": "log",
+      "text": "2026-08-05T18:44:02+00:00 [error] 34#34: *8821 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 10.2.1.4, server: api.internal, request: \"POST /v1/orders HTTP/1.1\", upstream: \"http://10.2.3.9:8080/v1/orders\", host: \"api.example.com\"\n10.2.1.4 - - [05/Aug/2026:18:44:02 +0000] \"POST /v1/orders HTTP/1.1\" 504 160 \"-\" \"curl/8.4.0\"\n2026-08-05T18:44:33+00:00 [error] 34#34: *8829 upstream timed out (110: Connection timed out) while reading response header from upstream, client: 10.2.1.5, server: api.internal, request: \"POST /v1/orders HTTP/1.1\"\n10.2.1.5 - - [05/Aug/2026:18:44:33 +0000] \"POST /v1/orders HTTP/1.1\" 504 160 \"-\" \"curl/8.4.0\"",
+      "relevantProblemSlugs": [
+        "nginx-ingress-504-gateway-timeout"
+      ],
+      "expectedTechnologies": [
+        "nginx-ingress-controller"
+      ],
+      "notes": "Mixed nginx error log and combined access log lines, the way an ingress-controller extract usually gets pasted."
+    },
+    {
+      "id": "q024",
+      "category": "log",
+      "shape": "log",
+      "text": "[INFO] 10.244.0.12:53821 - 55123 \"A IN metrics.internal.svc.cluster.local. udp 54 false 512\" - - 0 2.0001s\n[ERROR] plugin/errors: 2 metrics.internal.svc.cluster.local. A: plugin/loop: Loop (127.0.0.1:36421 -> :53) detected for zone \".\", see https://coredns.io/plugins/loop#troubleshooting. Query: \"HINFO 4547991809047724227.400057319072097461.\"\n[INFO] 10.244.0.12:53821 - 55124 \"A IN metrics.internal.svc.cluster.local. udp 54 false 512\" - - 2 0.0004s\n[ERROR] plugin/errors: 2 metrics.internal.svc.cluster.local. A: SERVFAIL",
+      "relevantProblemSlugs": [
+        "coredns-servfail-loop-detected"
+      ],
+      "expectedTechnologies": [
+        "coredns"
+      ],
+      "notes": "CoreDNS log lines starting with bracketed level tags — same problem as the bare q010 token."
+    },
+    {
+      "id": "q025",
+      "category": "log",
+      "shape": "log",
+      "text": "[wrangler:info] Ready on http://localhost:8787\n[2026-08-02T11:04:12.221Z] GET /api/orders/912 500 (Error 1101: Worker threw exception)\n[2026-08-02T11:04:12.230Z] Uncaught TypeError: Cannot read properties of undefined (reading 'id')\n[2026-08-02T11:05:47.902Z] GET /api/orders/913 500 (Error 1101: Worker threw exception)",
+      "relevantProblemSlugs": [
+        "workers-error-1101-uncaught-exception"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-workers",
+        "wrangler"
+      ],
+      "notes": "wrangler dev console output showing repeated Error 1101."
+    },
+    {
+      "id": "q026",
+      "category": "log",
+      "shape": "log",
+      "text": "2026-07-29T02:18:04.552118Z stderr F time=\"2026-07-29T02:18:04Z\" level=error msg=\"failed to create containerd task\" error=\"context deadline exceeded\" container=8f2a1c\n2026-07-29T02:18:04.552340Z stderr F time=\"2026-07-29T02:18:04Z\" level=error msg=\"RunPodSandbox from runtime service failed\" error=\"rpc error: code = DeadlineExceeded\"\n2026-07-29T02:18:09.611002Z stderr F time=\"2026-07-29T02:18:09Z\" level=warning msg=\"cleaning up after shim disconnected\" namespace=k8s.io\n2026-07-29T02:18:09.611240Z stderr F time=\"2026-07-29T02:18:09Z\" level=info msg=\"cleaning up dead shim\"",
+      "relevantProblemSlugs": [
+        "containerd-task-creation-failed-context-deadline"
+      ],
+      "expectedTechnologies": [
+        "containerd"
+      ],
+      "notes": "kubelet-forwarded containerd stderr, CRI-style prefix (stderr F)."
+    },
+    {
+      "id": "q027",
+      "category": "code_fragment",
+      "shape": "mixed",
+      "text": "import { pgTable, serial, text } from \"drizzle-orm/pg-core\";\nimport { orders } from \"./schema\";\n\nexport async function markShipped(orderId: number) {\n  return db.update(orders).set({ status: \"shipped\" }).where(eq(orders.id, orderId));\n}\n\n// throws DrizzleError as soon as this runs after a fresh migration",
+      "relevantProblemSlugs": [
+        "drizzle-error-invalid-schema-migration"
+      ],
+      "expectedTechnologies": [
+        "drizzle-orm"
+      ],
+      "notes": "Pairs with q016's stack trace for the same underlying migration problem."
+    },
+    {
+      "id": "q028",
+      "category": "code_fragment",
+      "shape": "mixed",
+      "text": "const stmt = env.DB.prepare(\n  \"INSERT INTO subscriptions (user_id, plan) VALUES (?, ?)\"\n);\nawait stmt.bind(userId, plan).run();\n\n// second call with the same user_id throws:\n// D1_ERROR: UNIQUE constraint failed: subscriptions.user_id: SQLITE_CONSTRAINT",
+      "relevantProblemSlugs": [
+        "d1-sqlite-constraint-unique-violation"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-d1"
+      ],
+      "notes": "D1 binding code plus the exact error text it produces on a second insert."
+    },
+    {
+      "id": "q029",
+      "category": "code_fragment",
+      "shape": "natural_language",
+      "text": "export default {\n  async fetch(request, env, ctx) {\n    const cached = await getCachedResponse(request);\n    ctx.waitUntil(logAnalytics(request));\n    return cached ?? fetch(request);\n  }\n};\n\nasync function getCachedResponse(request) {\n  return globalThis.__lastResponse; // captured from a previous request's closure\n}\n\n// throws: Cannot perform I/O on behalf of a different request. I/O objects (such as bodies) from a request are valid only within that same request.",
+      "relevantProblemSlugs": [
+        "workers-io-object-different-request"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-workers"
+      ],
+      "notes": "The anti-pattern (stashing a request/response in a module-level global) plus the error it produces."
+    },
+    {
+      "id": "q030",
+      "category": "code_fragment",
+      "shape": "mixed",
+      "text": "const pool = new Pool({ connectionString: process.env.DATABASE_URL });\n\napp.get(\"/orders\", async (req, res) => {\n  const client = await pool.connect();\n  const result = await client.query(\"SELECT * FROM orders WHERE user_id = $1\", [req.user.id]);\n  res.json(result.rows);\n  // client.release() is never called\n});\n\n// after a few hundred requests: timeout exceeded when trying to connect",
+      "relevantProblemSlugs": [
+        "node-pg-pool-exhausted-missing-release"
+      ],
+      "expectedTechnologies": [
+        "node-postgres"
+      ],
+      "notes": "Distinct from q014: a leaked connection under load, not a startup timeout."
+    },
+    {
+      "id": "q031",
+      "category": "code_fragment",
+      "shape": "mixed",
+      "text": "try {\n  await prisma.user.create({\n    data: { email: input.email, name: input.name },\n  });\n} catch (err) {\n  console.error(err);\n  throw err;\n}\n\n// PrismaClientKnownRequestError\n// Invalid `prisma.user.create()` invocation\n// Unique constraint failed on the fields: (`email`)\n// code: 'P2002'",
+      "relevantProblemSlugs": [
+        "prisma-p2002-unique-constraint-violation"
+      ],
+      "expectedTechnologies": [
+        "prisma"
+      ],
+      "notes": "Code plus the console output shape Prisma actually prints."
+    },
+    {
+      "id": "q032",
+      "category": "version_rich",
+      "shape": "exact_error",
+      "text": "Node 22 ERR_MODULE_NOT_FOUND after upgrade from 20",
+      "relevantProblemSlugs": [
+        "node-err-module-not-found-esm-upgrade"
+      ],
+      "expectedTechnologies": [
+        "nodejs"
+      ],
+      "notes": "Explicit before/after version pair."
+    },
+    {
+      "id": "q033",
+      "category": "version_rich",
+      "shape": "natural_language",
+      "text": "wrangler 4 d1 execute --remote hangs with no output",
+      "relevantProblemSlugs": [
+        "wrangler-d1-execute-remote-hangs"
+      ],
+      "expectedTechnologies": [
+        "wrangler",
+        "cloudflare-d1"
+      ],
+      "notes": "Version plus exact CLI flags."
+    },
+    {
+      "id": "q034",
+      "category": "version_rich",
+      "shape": "natural_language",
+      "text": "kubectl 1.33 client against a 1.31 control plane: the server doesn't have a resource type \"cronjobs\"",
+      "relevantProblemSlugs": [
+        "kubectl-unknown-resource-type-crd-not-installed"
+      ],
+      "expectedTechnologies": [
+        "kubectl",
+        "kubernetes"
+      ],
+      "notes": "Explicit client/server version skew."
+    },
+    {
+      "id": "q035",
+      "category": "version_rich",
+      "shape": "natural_language",
+      "text": "upgraded docker compose v1 to v2 and now it says no configuration file provided: not found",
+      "relevantProblemSlugs": [
+        "docker-compose-v2-config-file-not-found"
+      ],
+      "expectedTechnologies": [
+        "docker-compose"
+      ],
+      "notes": "Major-version migration named explicitly."
+    },
+    {
+      "id": "q036",
+      "category": "version_rich",
+      "shape": "natural_language",
+      "text": "went from postgres 15 to postgres 17 behind pgbouncer and now every other query fails with prepared statement does not exist",
+      "relevantProblemSlugs": [
+        "pgbouncer-prepared-statement-does-not-exist-transaction-pooling"
+      ],
+      "expectedTechnologies": [
+        "postgresql",
+        "pgbouncer"
+      ],
+      "notes": "Version jump spanning two majors, named on both ends."
+    },
+    {
+      "id": "q037",
+      "category": "version_rich",
+      "shape": "natural_language",
+      "text": "helm 3 upgrade after migrating off helm 2 gets stuck: Error: UPGRADE FAILED: another operation (install/upgrade/rollback) is in progress",
+      "relevantProblemSlugs": [
+        "helm-upgrade-failed-operation-in-progress"
+      ],
+      "expectedTechnologies": [
+        "helm"
+      ],
+      "notes": "Helm 2 to 3 migration plus the exact stuck-release error text."
+    },
+    {
+      "id": "q038",
+      "category": "version_rich",
+      "shape": "natural_language",
+      "text": "bun 1.2 panics loading a native addon that worked fine on bun 1.0",
+      "relevantProblemSlugs": [
+        "bun-panic-main-thread-native-module"
+      ],
+      "expectedTechnologies": [
+        "bun"
+      ],
+      "notes": "Two Bun minor versions named for comparison."
+    },
+    {
+      "id": "q039",
+      "category": "version_rich",
+      "shape": "natural_language",
+      "text": "after upgrading the cluster from kubernetes 1.31 to 1.33 the autoscaler leaves nodes FailedScheduling with Insufficient cpu",
+      "relevantProblemSlugs": [
+        "k8s-failedscheduling-insufficient-cpu"
+      ],
+      "expectedTechnologies": [
+        "kubernetes"
+      ],
+      "notes": "Cluster version upgrade plus the exact scheduling condition text."
+    },
+    {
+      "id": "q040",
+      "category": "natural_language",
+      "shape": "natural_language",
+      "text": "my worker times out but only in production, never locally with wrangler dev",
+      "relevantProblemSlugs": [
+        "workers-cpu-time-limit-exceeded"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-workers",
+        "wrangler"
+      ],
+      "notes": "Prose description; the dev-vs-prod distinction is the actual clue to the CPU-limit cause."
+    },
+    {
+      "id": "q041",
+      "category": "natural_language",
+      "shape": "natural_language",
+      "text": "postgres connections pile up under load until new requests just hang",
+      "relevantProblemSlugs": [
+        "postgres-too-many-clients-connection-pool-exhausted"
+      ],
+      "expectedTechnologies": [
+        "postgresql"
+      ],
+      "notes": "Same problem as q012's stack trace, described in prose with no error text at all."
+    },
+    {
+      "id": "q042",
+      "category": "natural_language",
+      "shape": "natural_language",
+      "text": "durable object websocket keeps disconnecting every time I deploy a new version of the worker",
+      "relevantProblemSlugs": [
+        "do-reset-code-update-websocket-drop"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-durable-objects"
+      ],
+      "notes": "Describes the deploy-triggers-reset behaviour without naming the error."
+    },
+    {
+      "id": "q043",
+      "category": "natural_language",
+      "shape": "natural_language",
+      "text": "why does my d1 database say the table doesn't exist even though I definitely ran the migration",
+      "relevantProblemSlugs": [
+        "d1-migration-not-applied-no-such-table"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-d1"
+      ],
+      "notes": "Classic phrasing of a migration-not-applied-to-remote confusion."
+    },
+    {
+      "id": "q044",
+      "category": "natural_language",
+      "shape": "natural_language",
+      "text": "kubernetes keeps killing my pods for using too much memory even though they look fine in monitoring",
+      "relevantProblemSlugs": [
+        "k8s-oomkilled-memory-limit"
+      ],
+      "expectedTechnologies": [
+        "kubernetes"
+      ],
+      "notes": "Third presentation of the OOMKilled problem, alongside q005 and q013."
+    },
+    {
+      "id": "q045",
+      "category": "natural_language",
+      "shape": "natural_language",
+      "text": "supabase inserts fail silently for logged in users but work fine from the sql editor",
+      "relevantProblemSlugs": [
+        "supabase-rls-policy-violation-insert"
+      ],
+      "expectedTechnologies": [
+        "supabase"
+      ],
+      "notes": "The SQL-editor-works detail is the tell for an RLS policy gap on the anon/authenticated role."
+    },
+    {
+      "id": "q046",
+      "category": "natural_language",
+      "shape": "natural_language",
+      "text": "docker image builds fine on my mac but fails on the arm server with a weird exec error",
+      "relevantProblemSlugs": [
+        "docker-exec-format-error-arch-mismatch"
+      ],
+      "expectedTechnologies": [
+        "docker"
+      ],
+      "notes": "Cross-architecture build/run mismatch, described entirely in prose."
+    },
+    {
+      "id": "q047",
+      "category": "natural_language",
+      "shape": "natural_language",
+      "text": "our ingress randomly returns gateway timeouts whenever traffic spikes",
+      "relevantProblemSlugs": [
+        "nginx-ingress-504-gateway-timeout"
+      ],
+      "expectedTechnologies": [
+        "nginx-ingress-controller"
+      ],
+      "notes": "Same problem as q023's log extract, described without any pasted output."
+    },
+    {
+      "id": "q048",
+      "category": "natural_language",
+      "shape": "natural_language",
+      "text": "the neon serverless driver just can't establish a connection when called from inside a worker",
+      "relevantProblemSlugs": [
+        "neon-websocket-connection-failed-serverless"
+      ],
+      "expectedTechnologies": [
+        "neon",
+        "cloudflare-workers"
+      ],
+      "notes": "Names the driver and the runtime but no error text."
+    },
+    {
+      "id": "q049",
+      "category": "natural_language",
+      "shape": "natural_language",
+      "text": "prisma throws an initialization error right after deploying but everything works locally",
+      "relevantProblemSlugs": [
+        "prisma-client-initialization-error-connection-string"
+      ],
+      "expectedTechnologies": [
+        "prisma"
+      ],
+      "notes": "Same problem as q007's bare exception name, described as symptom instead."
+    },
+    {
+      "id": "q050",
+      "category": "adversarial",
+      "shape": "natural_language",
+      "text": "postgres.js keeps saying prepared statement already exists after we put pgbouncer in front of it",
+      "relevantProblemSlugs": [
+        "postgresjs-prepared-statement-already-exists-pgbouncer"
+      ],
+      "expectedTechnologies": [
+        "postgres-js",
+        "pgbouncer"
+      ],
+      "notes": "ADVERSARIAL: a semantic match would likely surface pgbouncer-prepared-statement-does-not-exist-transaction-pooling — near-identical vocabulary (prepared statement, pgbouncer, connection pooling) and even opposite wording (already exists vs does not exist) sit close together in embedding space. The fix here is disabling postgres.js's automatic prepare, not changing PgBouncer's pool_mode; the two playbooks share a cause family but not a remedy."
+    },
+    {
+      "id": "q051",
+      "category": "adversarial",
+      "shape": "natural_language",
+      "text": "node process crashes with JavaScript heap out of memory even though the container has plenty of RAM to spare",
+      "relevantProblemSlugs": [
+        "node-heap-out-of-memory"
+      ],
+      "expectedTechnologies": [
+        "nodejs"
+      ],
+      "notes": "ADVERSARIAL: 'memory' and 'container' co-occurring strongly invite a match on k8s-oomkilled-memory-limit, but the query explicitly states the container has RAM to spare — the cause is V8's own default heap ceiling (--max-old-space-size), unrelated to the pod's resource limit. A semantic-only match that ignores that qualifying clause returns the wrong playbook."
+    },
+    {
+      "id": "q052",
+      "category": "adversarial",
+      "shape": "natural_language",
+      "text": "wrangler d1 execute says the database is locked when my worker and a cron trigger write at the same time",
+      "relevantProblemSlugs": [
+        "d1-sqlite-busy-concurrent-writes"
+      ],
+      "expectedTechnologies": [
+        "cloudflare-d1",
+        "wrangler"
+      ],
+      "notes": "ADVERSARIAL: 'database locked under concurrent writes' is generic enough to pull in postgres-deadlock-detected-40p01 by pure semantic similarity. D1's single-writer SQLite model needs retry/serialization, not the transaction-ordering fix that resolves a Postgres deadlock — the two are not interchangeable despite the shared vocabulary."
+    },
+    {
+      "id": "q053",
+      "category": "adversarial",
+      "shape": "natural_language",
+      "text": "cannot find module right after a fresh clone even though npm install finished with no errors",
+      "relevantProblemSlugs": [
+        "node-cannot-find-module-missing-install"
+      ],
+      "expectedTechnologies": [
+        "nodejs"
+      ],
+      "notes": "ADVERSARIAL: textually and semantically adjacent to node-err-module-not-found-esm-upgrade (both are Node module-resolution errors), but this one is a missing/mismatched dependency — a lockfile or postinstall problem — not an ESM extension-resolution change. Answering with the ESM playbook sends the reader nowhere."
+    },
+    {
+      "id": "q054",
+      "category": "adversarial",
+      "shape": "natural_language",
+      "text": "pods stuck ImagePullBackOff in the cluster but docker pull for the same image works fine on my laptop",
+      "relevantProblemSlugs": [
+        "k8s-imagepullbackoff-private-registry"
+      ],
+      "expectedTechnologies": [
+        "kubernetes"
+      ],
+      "notes": "ADVERSARIAL: heavy lexical overlap ('pull', 'access', 'registry') invites a generic Docker 'pull access denied' / docker-login playbook. The query itself rules that out — docker pull succeeding locally proves registry credentials are fine outside the cluster, so the actual fix is the pod's imagePullSecrets binding, a Kubernetes-side problem, not a Docker-side one."
+    },
+    {
+      "id": "q055",
+      "category": "zero_result",
+      "shape": "natural_language",
+      "text": "AWS Lambda cold starts are wildly inconsistent between regions",
+      "relevantProblemSlugs": [],
+      "expectedTechnologies": [],
+      "notes": "ZERO-RESULT: AWS Lambda is outside the taxonomy entirely (Cloudflare/edge, Postgres, Docker/Kubernetes per IMPLEMENTATION.md §20). Returning anything here is a false positive."
+    },
+    {
+      "id": "q056",
+      "category": "zero_result",
+      "shape": "natural_language",
+      "text": "mongodb replica set won't elect a new primary after a failover",
+      "relevantProblemSlugs": [],
+      "expectedTechnologies": [],
+      "notes": "ZERO-RESULT: MongoDB is not in the taxonomy; the corpus is Postgres-only for databases."
+    },
+    {
+      "id": "q057",
+      "category": "zero_result",
+      "shape": "natural_language",
+      "text": "react useEffect fires twice in development mode and I don't know why",
+      "relevantProblemSlugs": [],
+      "expectedTechnologies": [],
+      "notes": "ZERO-RESULT: no frontend framework is in scope; a plausible, commonly-asked question the corpus should not attempt to answer."
+    }
+  ]
+}

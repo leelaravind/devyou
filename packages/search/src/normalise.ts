@@ -51,8 +51,8 @@ const VOLATILE: ReadonlyArray<{ name: string; pattern: RegExp; replacement: stri
     thing that identifies the code. `/home/alice/app/src/db.ts` and
     `/Users/bob/work/api/src/db.ts` should fingerprint identically as `<path>/db.ts`.
   */
-  { name: "unix-path", pattern: /(?:\/[\w.\-@]+){2,}\/([\w.\-]+)/g, replacement: "<path>/$1" },
-  { name: "windows-path", pattern: /[A-Za-z]:\\(?:[\w.\-@ ]+\\)+([\w.\-]+)/g, replacement: "<path>/$1" },
+  { name: "unix-path", pattern: /(?:\/[\w.@-]+){2,}\/([\w.-]+)/g, replacement: "<path>/$1" },
+  { name: "windows-path", pattern: /[A-Za-z]:\\(?:[\w.@ -]+\\)+([\w.-]+)/g, replacement: "<path>/$1" },
   { name: "line-col", pattern: /:\d+:\d+/g, replacement: ":<line>" },
   { name: "hash-suffix", pattern: /-[0-9a-z]{8}\.(js|css|mjs|map)\b/gi, replacement: "-<hash>.$1" },
   { name: "pid", pattern: /\bpid[= ]\d+/gi, replacement: "pid=<n>" },
@@ -213,7 +213,7 @@ const FRAME_PATTERNS: readonly RegExp[] = [
   /at\s+([\w$.<>]+)\s*\(/g, // JS: "at Object.foo ("
   /\bat\s+([\w.$]+\.[\w$]+)\(/g, // Java: "at com.example.Foo.bar("
   /File\s+"[^"]*\/([\w.]+\.py)",\s+line\s+\d+,\s+in\s+(\w+)/g, // Python
-  /\b((?:node_modules\/)?[@\w.\-/]+)\/([\w.\-]+\.(?:js|mjs|cjs|ts|tsx|py|go|rb|rs|java|kt)):/g,
+  /\b((?:node_modules\/)?[@\w./-]+)\/([\w.-]+\.(?:js|mjs|cjs|ts|tsx|py|go|rb|rs|java|kt)):/g,
   /\bin\s+([\w.]+)\s+at\s+[\w./\\]+:\d+/g, // Go-ish
 ];
 

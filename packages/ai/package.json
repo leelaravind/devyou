@@ -14,7 +14,10 @@
     "test:unit": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@devyou/core": "workspace:*"
+    "@devyou/core": "workspace:*",
+    "@anthropic-ai/sdk": "^0.120.0",
+    "zod": "^4.4.3",
+    "@devyou/security": "workspace:*"
   },
   "devDependencies": {
     "@devyou/config": "workspace:*",

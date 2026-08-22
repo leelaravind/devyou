@@ -146,7 +146,13 @@ export default [
   {
     // Fixtures deliberately contain hostile strings: XSS payloads, bidi controls,
     // prompt-injection attempts. They are data, not code to be linted for style.
-    files: ["**/*.d.ts"],
+    /*
+      Augmenting an ambient global (`Cloudflare.Env`) requires a namespace — there
+      is no module syntax that does it. The test setup file declares the
+      test-only `TEST_MIGRATIONS` binding that way rather than adding it to the
+      Worker's real binding surface.
+    */
+    files: ["**/*.d.ts", "**/test/apply-migrations.ts"],
     rules: { "@typescript-eslint/no-namespace": "off" },
   },
 ];

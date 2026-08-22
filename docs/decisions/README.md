@@ -10,9 +10,9 @@ superseding the old one — never by editing history.
 | [0001](./0001-product-isolation-and-admin-boundary.md) | Product isolation and the Admin Console boundary | Accepted | 0 |
 | [0002](./0002-product-hostnames-and-resource-naming.md) | Product hostnames and Cloudflare resource naming | Accepted | 0 |
 | [0003](./0003-react-router-ssr-on-cloudflare-workers.md) | React Router SSR on Cloudflare Workers | Accepted | 0 |
-| 0004 | D1 relational canonical store; no graph database in V1 | Planned | 2 |
-| 0005 | Immutable revisions and append-only evidence | Planned | 2 |
-| 0006 | Typed verification model; no binary verified field | Planned | 2 |
+| 0004 | D1 relational canonical store; no graph database in V1 | Accepted | 2 |
+| 0005 | Immutable revisions and append-only evidence | Accepted | 2 |
+| 0006 | Typed verification model; no binary verified field | Accepted | 2 |
 | 0007 | No arbitrary code execution in V1 | Planned | 4 |
 | 0008 | Search baseline: exact + FTS first, semantic experimental | Planned | 3 |
 | 0009 | Authentication strategy | Planned | 6 |

@@ -1,0 +1,646 @@
+{
+  "$comment": "DevYou seed corpus — PostgreSQL, PgBouncer, Prisma, Supabase, Neon, Docker Compose and Node.js/V8 memory playbooks. Field names are authoritative from scripts/seed-playbooks.mjs. technologies/constraints[].technology values are slugs from packages/config/taxonomy/technologies.json. Every graph passes packages/domain/src/graph.ts validateGraph. Written and reviewed, not independently reproduced — see revision_confidence in the seed script.",
+  "playbooks": [
+    {
+      "slug": "postgres-sqlstate-40001-serialization-failure",
+      "problemTitle": "Postgres SQLSTATE 40001: could not serialize access due to concurrent update",
+      "problemSummary": "A transaction running under REPEATABLE READ or SERIALIZABLE isolation aborts with SQLSTATE 40001 because Postgres detected a conflict with a concurrent transaction that it cannot resolve while preserving the isolation guarantee.",
+      "title": "Diagnosing and handling Postgres serialization failures (40001)",
+      "summary": "Covers confirming this is a genuine repeatable-read/serializable conflict and adding the application-level retry that Postgres's own documentation prescribes. It does not cover deadlocks (SQLSTATE 40P01 — a different mechanism entirely, see the deadlock playbook) and does not attempt to tune away contention at the schema level.",
+      "symptoms": [
+        "A query or COMMIT fails with `ERROR: could not serialize access due to concurrent update`",
+        "The error appears intermittently under concurrent load and the same transaction succeeds on retry",
+        "The driver reports SQLSTATE 40001"
+      ],
+      "signatures": [
+        { "errorCode": "40001", "normalisedMessage": "error: could not serialize access due to concurrent update", "languageHint": "sql", "runtimeHint": "postgres" }
+      ],
+      "technologies": ["postgresql"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "You're seeing SQLSTATE 40001", "body": "A transaction failed with `could not serialize access due to concurrent update`, SQLSTATE 40001. This only happens under REPEATABLE READ or SERIALIZABLE isolation — Postgres detected that letting both this transaction and a concurrent one commit could not have arisen from any serial execution, so it aborted one of them." },
+        { "id": "n2", "type": "test", "title": "Confirm the transaction is running above READ COMMITTED", "body": "Run this inside the same session/transaction that failed, or check the application/ORM config for an explicit isolation level (e.g. Prisma's `isolationLevel`, a driver's `SET TRANSACTION ISOLATION LEVEL`, or a framework default).", "command": "SHOW transaction_isolation;", "commandLanguage": "sql", "expectedOutput": " transaction_isolation \n------------------------\n repeatable read\n(1 row)", "safetyLevel": "informational" },
+        { "id": "n3", "type": "root_cause", "title": "This is Postgres's conflict detection working as designed", "body": "Under REPEATABLE READ and SERIALIZABLE, Postgres aborts one of two conflicting concurrent transactions rather than allow a result that no serial ordering of them could have produced. This is not corruption and not a bug — the aborted transaction is expected to be retried from its first statement. A high rate of 40001 aborts means the same rows (or, under SERIALIZABLE, the same predicates) are being contended by many concurrent transactions." },
+        { "id": "n4", "type": "terminal", "title": "40001 without elevated isolation is unusual", "body": "This playbook covers only the standard REPEATABLE READ / SERIALIZABLE write-conflict. If the session is genuinely READ COMMITTED, re-check that the SQLSTATE and message text were captured correctly, and look for a `SET TRANSACTION ISOLATION LEVEL` issued inside a function, trigger, or ORM interceptor that elevates isolation for just this one statement. Diagnosing that further is outside what this playbook prescribes." },
+        { "id": "n5", "type": "fix", "title": "Retry the whole transaction on 40001", "body": "Catch SQLSTATE 40001 specifically and re-run the transaction from its very first statement (not just the last query) with a short backoff — the transaction's snapshot is invalid after the abort, so replaying only the failing statement is not sufficient. Most Postgres client libraries and ORMs surface the SQLSTATE on the thrown error object (e.g. `error.code === '40001'` in node-postgres/Prisma). You can also reduce how often this happens by taking an explicit `SELECT ... FOR UPDATE` lock earlier in the transaction to serialise access to hot rows, but that changes concurrency behaviour and is a separate decision from adding the retry." },
+        { "id": "n6", "type": "verification", "title": "Confirm the retry logic is actually working", "body": "Watch the rollback trend for the database over a period that includes normal concurrent load.", "command": "SELECT datname, xact_commit, xact_rollback\nFROM pg_stat_database\nWHERE datname = current_database();", "commandLanguage": "sql", "expectedOutput": " datname | xact_commit | xact_rollback \n---------+-------------+---------------\n appdb   |      184213 |           412\n(1 row)", "safetyLevel": "informational" },
+        { "id": "n7", "type": "terminal", "title": "Resolved", "body": "40001 errors are being retried transparently and no longer reach users. `xact_rollback` will still include the aborted attempts — that's expected, not a regression." },
+        { "id": "n8", "type": "terminal", "title": "Still surfacing to users", "body": "If retries are implemented but 40001 still propagates, either the retry isn't restarting from the transaction's first statement, the configured retry count is too low for the current abort rate, or contention is high enough that reducing it (shorter transactions, narrower row ranges per transaction, an explicit lock to serialise the hottest rows) is needed alongside the retry. Diagnosing which is outside this playbook's scope." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n5", "to": "n6", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n6", "to": "n8", "condition": "failed" },
+        { "from": "n6", "to": "n8", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://www.postgresql.org/docs/current/transaction-iso.html", "title": "13.2. Transaction Isolation", "type": "official_docs", "publisher": "PostgreSQL" },
+        { "url": "https://www.postgresql.org/docs/current/errcodes-appendix.html", "title": "Appendix A. PostgreSQL Error Codes", "type": "official_docs", "publisher": "PostgreSQL" }
+      ]
+    },
+    {
+      "slug": "postgres-too-many-clients-connection-pool-exhausted",
+      "problemTitle": "Postgres: FATAL: sorry, too many clients already",
+      "problemSummary": "The server has reached max_connections (or is close to it) and is rejecting new connections with 'too many clients already', so new requests either error outright or hang waiting for a connection that never comes free.",
+      "title": "Diagnosing Postgres connection exhaustion (too many clients already)",
+      "summary": "Covers the shortest path to confirming you're actually out of connections, finding who's holding them, and the immediate relief versus durable fix. Does not cover PgBouncer's own client-limit error (see the PgBouncer playbook) or ORM/driver-specific pool leaks beyond pointing at the node-postgres playbooks that cover them in depth.",
+      "symptoms": [
+        "New connection attempts fail with `FATAL: sorry, too many clients already`",
+        "Requests hang rather than error outright, because the app-side pool is waiting for a server connection that never frees up",
+        "The problem worsens under load and clears itself after a deploy or restart"
+      ],
+      "signatures": [
+        { "errorCode": "53300", "normalisedMessage": "fatal: sorry, too many clients already", "languageHint": "sql", "runtimeHint": "postgres" }
+      ],
+      "technologies": ["postgresql"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "New connections are being refused with 'too many clients already'", "body": "Postgres has a hard `max_connections` ceiling; once every slot is in use, every further connection attempt is rejected at the protocol level, before authentication even completes." },
+        { "id": "n2", "type": "test", "title": "Check whether you're actually at max_connections", "body": "Run as any role that can connect — this reads shared server state, not per-role limits.", "command": "SELECT (SELECT count(*) FROM pg_stat_activity) AS current_connections,\n       (SELECT setting FROM pg_settings WHERE name = 'max_connections') AS max_connections;", "commandLanguage": "sql", "expectedOutput": " current_connections | max_connections \n----------------------+-----------------\n                   98 | 100\n(1 row)", "safetyLevel": "informational" },
+        { "id": "n3", "type": "test", "title": "Check for connections stuck idle in an open transaction", "body": "This is the single most common actionable cause: a connection that isn't doing any work but is still holding its slot because its transaction was never committed or rolled back.", "command": "SELECT pid, usename, application_name, state, now() - state_change AS idle_for, query\nFROM pg_stat_activity\nWHERE state = 'idle in transaction'\nORDER BY idle_for DESC\nLIMIT 20;", "commandLanguage": "sql", "expectedOutput": " pid  | usename | application_name |        state        |    idle_for     |               query                \n------+---------+-------------------+----------------------+------------------+-------------------------------------\n 8821 | appuser | api-worker-3      | idle in transaction | 00:14:52.331     | UPDATE orders SET status = $1 ...\n 8790 | appuser | api-worker-1      | idle in transaction | 00:11:07.998     | SELECT * FROM accounts WHERE ...\n(2 rows)", "safetyLevel": "informational" },
+        { "id": "n4", "type": "terminal", "title": "Not actually at the connection limit", "body": "If current connections aren't close to max_connections, this specific error isn't happening because of server-side exhaustion right now. Check the app-side pool's own configuration and error (see the node-postgres connection-timeout playbook) or a transient network issue — out of scope here." },
+        { "id": "n5", "type": "root_cause", "title": "Application code is leaving transactions open", "body": "Connections sitting in `idle in transaction` aren't doing work but still count fully against max_connections. Common causes: a missing COMMIT/ROLLBACK on an exception path, a connection checked out of a pool and never released back to it (see the node-postgres pool-leak playbook), or a long pause inside a transaction — e.g. waiting on an external API call — before committing." },
+        { "id": "n6", "type": "root_cause", "title": "Genuine concurrency is exceeding max_connections", "body": "If there's no meaningful idle-in-transaction backlog, the connections are legitimately active/short-lived and the workload has simply outgrown the configured limit. Each Postgres connection is a full backend process — raising max_connections carelessly trades one problem (connection refusal) for another (memory pressure from work_mem × connections, and more contention on shared resources). The standard fix at this point is a connection pooler such as PgBouncer in front of Postgres, or reducing how many connections each application instance opens, rather than an unbounded increase to max_connections." },
+        { "id": "n7", "type": "fix", "title": "Free the stuck connections, then stop the leak", "body": "For immediate relief, terminate the backends found above that have been idle-in-transaction well beyond any legitimate reason. This is destructive to whatever those transactions were doing — only run it once you've confirmed they're actually stuck, not just slow. For the durable fix: find and correct the code path that isn't committing/rolling back, and set `idle_in_transaction_session_timeout` so a future leak can't silently hold connections open indefinitely.", "command": "SELECT pg_terminate_backend(pid)\nFROM pg_stat_activity\nWHERE state = 'idle in transaction'\n  AND now() - state_change > interval '10 minutes';", "commandLanguage": "sql", "safetyLevel": "destructive", "safetyEffect": "Forcibly kills every backend that has been idle inside an open transaction for more than 10 minutes. Each killed connection's in-progress transaction is rolled back and the client sees its connection drop — any work that transaction had not committed is lost." },
+        { "id": "n8", "type": "verification", "title": "Confirm there's real headroom again", "body": "Re-run the same check used at the start.", "command": "SELECT (SELECT count(*) FROM pg_stat_activity) AS current_connections,\n       (SELECT setting FROM pg_settings WHERE name = 'max_connections') AS max_connections;", "commandLanguage": "sql", "expectedOutput": " current_connections | max_connections \n----------------------+-----------------\n                   41 | 100\n(1 row)", "safetyLevel": "informational" },
+        { "id": "n9", "type": "terminal", "title": "Resolved", "body": "Connection count has real headroom. Keep the idle_in_transaction_session_timeout in place so this doesn't quietly recur." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n3", "to": "n6", "condition": "failed" },
+        { "from": "n3", "to": "n6", "condition": "unknown" },
+        { "from": "n5", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n8", "to": "n9", "condition": "passed" },
+        { "from": "n8", "to": "n6", "condition": "failed" },
+        { "from": "n8", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://www.postgresql.org/docs/current/runtime-config-connection.html", "title": "20.3. Connections and Authentication", "type": "official_docs", "publisher": "PostgreSQL" },
+        { "url": "https://www.postgresql.org/docs/current/monitoring-stats.html", "title": "Chapter 28. Monitoring Database Activity", "type": "official_docs", "publisher": "PostgreSQL" }
+      ]
+    },
+    {
+      "slug": "postgres-deadlock-detected-40p01",
+      "problemTitle": "Postgres SQLSTATE 40P01: deadlock detected",
+      "problemSummary": "Two transactions each held a lock the other needed and waited on each other in a cycle; Postgres's deadlock detector broke the cycle by aborting one of them with SQLSTATE 40P01 after deadlock_timeout.",
+      "title": "Diagnosing and preventing Postgres deadlocks (40P01)",
+      "summary": "Covers reading the log detail Postgres already wrote, identifying the lock-ordering mismatch, and enforcing a consistent order. Does not cover SQLSTATE 40001 serialization failures — a different SQLSTATE and a different mechanism entirely, with its own playbook — and does not cover finding a leak; a deadlock always resolves itself within about a second whether or not anyone looks at it.",
+      "symptoms": [
+        "A query or transaction fails with `ERROR: deadlock detected`",
+        "The server log shows a DETAIL line naming two process IDs waiting on each other",
+        "It happens only under concurrent writes and each individual transaction looks correct on its own"
+      ],
+      "signatures": [
+        { "errorCode": "40P01", "normalisedMessage": "error: deadlock detected", "languageHint": "sql", "runtimeHint": "postgres" }
+      ],
+      "technologies": ["postgresql"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "You're seeing SQLSTATE 40P01", "body": "A deadlock always self-resolves: Postgres's background deadlock detector wakes after `deadlock_timeout` (1 second by default) of waiting, finds the wait cycle, and aborts one of the two transactions so the other can proceed. By the time you're reading the error, it's already over — there is nothing 'stuck' left to kill. What's left to do is find out why the two transactions waited on each other and stop it recurring." },
+        { "id": "n2", "type": "test", "title": "Read the DETAIL line Postgres already logged", "body": "Deadlock errors are always written to the server log with DETAIL, CONTEXT and STATEMENT lines, regardless of client-visible log settings, because it's an ERROR-severity message. Find the entry for this occurrence — it names the two blocked process IDs, what lock each was waiting for, and (in CONTEXT) the statement each was running. If `log_line_prefix` doesn't include enough to correlate application requests to PIDs, note that for later.", "safetyLevel": "informational" },
+        { "id": "n3", "type": "test", "title": "Do the two statements touch the same rows/tables in a different order?", "body": "Compare the two STATEMENT lines (and the code paths that issued them) against each other. The classic deadlock is two transactions that both update, say, table A then table B, but one code path does it A-then-B while another does it B-then-A — under concurrency each can end up holding the first lock and waiting for the second, which the other already holds." },
+        { "id": "n4", "type": "root_cause", "title": "Classic lock-ordering deadlock", "body": "Two code paths acquire locks on the same set of rows/tables in different orders. Under enough concurrency, two transactions can each grab the first lock in their own order and then block waiting for the second — a genuine cycle, which Postgres detects and breaks." },
+        { "id": "n5", "type": "fix", "title": "Turn on full lock-wait logging for the next occurrence", "body": "If the existing log entry didn't have enough detail to pin down which two code paths were involved — most often because `log_line_prefix` is missing the PID, or the application doesn't log which request issued which query — enable logging of lock waits generally so the next deadlock (or even a near-miss that doesn't escalate to one) is fully captured with context you can correlate." },
+        { "id": "n6", "type": "root_cause", "title": "Not a simple two-table ordering mismatch", "body": "If the two statements touch the same rows/tables in the same nominal order, the conflict is more likely coming from an implicit lock — a foreign key check taking a share lock on the referenced row, a unique index insert, or a `SELECT ... FOR UPDATE` scanning more rows than expected because it isn't using the index you assumed. Tracing that down is outside what this playbook covers; the DETAIL/CONTEXT lines from the log are the starting point." },
+        { "id": "n7", "type": "fix", "title": "Enforce a single, consistent lock acquisition order", "body": "Make every code path that touches more than one row from the same contended set acquire its locks in the same order — for example, always by ascending primary key. Where possible, do it in one statement rather than a loop of separate statements from application code, since a single UPDATE/SELECT processes its own row locks in a determinate order that application-level loops don't guarantee.", "command": "SELECT id FROM accounts WHERE id = ANY($1::int[]) ORDER BY id FOR UPDATE;", "commandLanguage": "sql", "safetyLevel": "state_changing", "safetyEffect": "Takes row-level locks on the selected accounts, in ascending id order, for the remainder of the transaction. No rows are modified by this statement itself; it only changes lock acquisition order to prevent a future cycle." },
+        { "id": "n8", "type": "verification", "title": "Confirm deadlocks have stopped recurring", "body": "pg_stat_database keeps a running deadlock counter per database since the last stats reset.", "command": "SELECT datname, deadlocks\nFROM pg_stat_database\nWHERE datname = current_database();", "commandLanguage": "sql", "expectedOutput": " datname | deadlocks \n---------+-----------\n appdb   |         0\n(1 row)", "safetyLevel": "informational" },
+        { "id": "n9", "type": "terminal", "title": "Resolved", "body": "The deadlock counter is no longer climbing under the same workload that used to trigger it." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n5", "condition": "failed" },
+        { "from": "n2", "to": "n5", "condition": "unknown" },
+        { "from": "n3", "to": "n4", "condition": "passed" },
+        { "from": "n3", "to": "n6", "condition": "failed" },
+        { "from": "n3", "to": "n6", "condition": "unknown" },
+        { "from": "n4", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n8", "to": "n9", "condition": "passed" },
+        { "from": "n8", "to": "n6", "condition": "failed" },
+        { "from": "n8", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://www.postgresql.org/docs/current/explicit-locking.html", "title": "13.3. Explicit Locking", "type": "official_docs", "publisher": "PostgreSQL" },
+        { "url": "https://www.postgresql.org/docs/current/runtime-config-logging.html", "title": "20.8. Error Reporting and Logging", "type": "official_docs", "publisher": "PostgreSQL" },
+        { "url": "https://www.postgresql.org/docs/current/monitoring-stats.html", "title": "Chapter 28. Monitoring Database Activity", "type": "official_docs", "publisher": "PostgreSQL" }
+      ]
+    },
+    {
+      "slug": "pgbouncer-max-client-conn-exceeded",
+      "problemTitle": "PgBouncer: no more connections allowed (max_client_conn)",
+      "problemSummary": "PgBouncer itself has a ceiling on how many client (frontend) connections it will accept, separate from Postgres's own max_connections, and that ceiling has been reached.",
+      "title": "Diagnosing PgBouncer's max_client_conn limit",
+      "summary": "Covers PgBouncer's own client-facing connection ceiling — a different limit from Postgres's max_connections and from PgBouncer's server-side pool sizing. Does not cover prepared-statement errors under transaction pooling (see the two prepared-statement playbooks) or Postgres running out of connections directly (see the postgres-too-many-clients playbook).",
+      "symptoms": [
+        "New connections through PgBouncer are refused with `no more connections allowed (max_client_conn)`",
+        "The PgBouncer log repeats the same warning/closing lines for many client IPs in a short window",
+        "Connecting straight to Postgres, bypassing PgBouncer, still works fine"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "pooler error: no more connections allowed (max_client_conn)", "languageHint": "sql", "runtimeHint": "pgbouncer" }
+      ],
+      "technologies": ["pgbouncer"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "PgBouncer is refusing new client connections", "body": "This is PgBouncer's own `max_client_conn` — the number of frontend (application-side) connections it will accept — not Postgres's `max_connections`, and not PgBouncer's server-side pool size (`default_pool_size` / `max_db_connections`). Those are three independent limits." },
+        { "id": "n2", "type": "test", "title": "Check current clients against the configured limit", "body": "Connect to PgBouncer's admin console — not a normal database — with `psql -h <pgbouncer-host> -p <pgbouncer-port> -U <admin-user> pgbouncer`, then run:", "command": "SHOW CLIENTS;", "commandLanguage": "sql", "expectedOutput": " type |   user   | database |  state |   addr      | port  | ... \n------+----------+----------+--------+-------------+-------+-----\n C    | appuser  | appdb    | active | 10.0.4.12   | 51422 | ...\n C    | appuser  | appdb    | active | 10.0.4.19   | 51501 | ...\n(2000 rows)", "safetyLevel": "informational" },
+        { "id": "n3", "type": "observation", "title": "Break the client count down by pool", "body": "SHOW POOLS gives a per-database/user summary with active and waiting client counts, which is faster to reason about than scrolling SHOW CLIENTS when there are thousands of rows.", "command": "SHOW POOLS;", "commandLanguage": "sql", "expectedOutput": " database | user    | cl_active | cl_waiting | sv_active | sv_idle | ... \n----------+---------+-----------+------------+-----------+---------+-----\n appdb    | appuser |      2000 |        340 |        20 |       0 | ...\n(1 row)", "safetyLevel": "informational" },
+        { "id": "n4", "type": "terminal", "title": "Not actually at max_client_conn", "body": "If the client count found above is nowhere near the configured limit, this specific message isn't what's happening right now — check for a different error (e.g. Postgres's own too-many-clients, or a prepared-statement error) instead." },
+        { "id": "n5", "type": "root_cause", "title": "Client connections are consistently at the ceiling", "body": "Common causes: many application instances or serverless/edge functions each opening their own connections without reuse, a client-side connection leak (never closed), or `max_client_conn` genuinely undersized for the current fleet. PgBouncer accepting thousands of client connections cheaply while multiplexing them onto a much smaller server-side pool is the entire point of running it — so raising the client limit is usually safe as long as the server-side pool size is left alone." },
+        { "id": "n6", "type": "fix", "title": "Raise max_client_conn and reload without dropping connections", "body": "Edit `max_client_conn` in pgbouncer.ini (e.g. to 2000), then apply it with the admin console's RELOAD command rather than restarting the process.", "command": "RELOAD;", "commandLanguage": "sql", "safetyLevel": "state_changing", "safetyEffect": "Reloads pgbouncer.ini into the running process, applying the new max_client_conn (and any other edited settings) immediately, without dropping existing client or server connections." },
+        { "id": "n7", "type": "verification", "title": "Confirm the new limit took effect and there's headroom", "body": "Check the config value directly.", "command": "SHOW CONFIG;", "commandLanguage": "sql", "expectedOutput": " key             | value | changeable \n------------------+-------+------------\n max_client_conn  | 2000  | yes\n(1 row)", "safetyLevel": "informational" },
+        { "id": "n8", "type": "terminal", "title": "Resolved", "body": "max_client_conn now reflects real client demand with headroom. If the underlying cause was a leak rather than genuine growth, raising the limit buys time but doesn't fix the leak." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n5", "to": "n6", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n5", "condition": "failed" },
+        { "from": "n7", "to": "n5", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://www.pgbouncer.org/config.html", "title": "PgBouncer 1.x - Configuration", "type": "official_docs", "publisher": "PgBouncer" },
+        { "url": "https://www.pgbouncer.org/usage.html", "title": "PgBouncer 1.x - Usage", "type": "official_docs", "publisher": "PgBouncer" }
+      ]
+    },
+    {
+      "slug": "pgbouncer-prepared-statement-does-not-exist-transaction-pooling",
+      "problemTitle": "PgBouncer transaction pooling: prepared statement does not exist",
+      "problemSummary": "A named server-side prepared statement was created on one Postgres backend connection, but PgBouncer's transaction (or statement) pooling handed a later statement to a different backend that never saw the PREPARE.",
+      "title": "Fixing 'prepared statement does not exist' under PgBouncer transaction pooling",
+      "summary": "Covers the PgBouncer-side mechanism and its two fixes: native prepared-statement tracking (1.21+) or avoiding named server-side prepared statements. Does not cover postgres.js's mirror-image 'already exists' error, which shares the same underlying incompatibility but needs a client-side fix, not a PgBouncer-side one — see the postgres.js playbook, which is not interchangeable with this one despite the similar wording.",
+      "symptoms": [
+        "Queries intermittently fail with `prepared statement \"...\" does not exist`",
+        "It gets worse under load and is rare or absent with a single connection",
+        "It started (or got worse) after putting PgBouncer in front of Postgres, or after changing pool_mode"
+      ],
+      "signatures": [
+        { "errorCode": "26000", "normalisedMessage": "error: prepared statement does not exist", "languageHint": "sql", "runtimeHint": "pgbouncer" }
+      ],
+      "technologies": ["pgbouncer", "postgresql"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "A named prepared statement 'does not exist'", "body": "This surfaces through PgBouncer, but the underlying mechanism is about which Postgres backend connection actually has the statement prepared." },
+        { "id": "n2", "type": "test", "title": "Confirm the pool is in transaction (or statement) pooling mode", "body": "Connect to PgBouncer's admin console (`psql -h <host> -p <port> pgbouncer`) and check pool_mode for the affected database.", "command": "SHOW CONFIG;", "commandLanguage": "sql", "expectedOutput": " key        | value       | changeable \n------------+-------------+------------\n pool_mode  | transaction | yes\n(1 row)", "safetyLevel": "informational" },
+        { "id": "n3", "type": "root_cause", "title": "Transaction pooling reassigns server connections between statements", "body": "In transaction (or statement) pooling mode, PgBouncer returns the underlying server connection to the pool as soon as a transaction (or statement) ends, and a client's next transaction may be handed a completely different server connection. A named prepared statement exists only on the specific backend it was PREPARE'd on — so a later statement that references it by name, on a different backend that never ran that PREPARE, fails with 'does not exist'." },
+        { "id": "n4", "type": "terminal", "title": "pool_mode is session, not transaction/statement", "body": "In session pooling, a client keeps the same server connection for its whole session, so this specific failure mode shouldn't occur. If it's still happening under session pooling, something else is going on — out of scope here." },
+        { "id": "n5", "type": "fix", "title": "Check PgBouncer's version, then use native prepared-statement tracking or turn it off client-side", "body": "PgBouncer 1.21 and later can track and transparently re-prepare named statements per server connection when max_prepared_statements is set above 0 — this is the preferred fix if your version supports it. Edit pgbouncer.ini and reload with RELOAD; via the admin console once changed.", "command": "max_prepared_statements = 200", "commandLanguage": "ini", "safetyLevel": "state_changing", "safetyEffect": "Once reloaded (RELOAD; via the admin console), enables PgBouncer to track and transparently re-prepare named statements per server connection, up to 200 concurrently per connection. Existing connections and in-flight transactions are not dropped by the reload." },
+        { "id": "n6", "type": "verification", "title": "Confirm the errors stop and the setting is active", "body": "Re-check the config after reloading, and re-run the workload that was triggering the error.", "command": "SHOW CONFIG;", "commandLanguage": "sql", "expectedOutput": " key                        | value | changeable \n-----------------------------+-------+------------\n max_prepared_statements    | 200   | yes\n(1 row)", "safetyLevel": "informational" },
+        { "id": "n7", "type": "terminal", "title": "Resolved", "body": "PgBouncer is now re-preparing statements transparently per backend connection." },
+        { "id": "n8", "type": "fix", "title": "If you can't upgrade PgBouncer yet, stop using named prepared statements against the pooled connection", "body": "Disable automatic/named prepared statements on the client for connections that go through this pool — for example, in postgres.js this is the `prepare: false` client option (see that playbook for the client-side version of this same incompatibility); in a driver that names statements explicitly, switch to unnamed/simple-protocol queries for this database. Alternatively, set pool_mode to session for just this database, at the cost of losing transaction pooling's connection-reuse efficiency." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n5", "to": "n6", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n6", "to": "n8", "condition": "failed" },
+        { "from": "n6", "to": "n8", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://www.pgbouncer.org/config.html", "title": "PgBouncer 1.x - Configuration", "type": "official_docs", "publisher": "PgBouncer" }
+      ]
+    },
+    {
+      "slug": "postgresjs-prepared-statement-already-exists-pgbouncer",
+      "problemTitle": "postgres.js: prepared statement already exists (behind PgBouncer)",
+      "problemSummary": "postgres.js automatically prepares each distinct query text and reuses it by name for speed, an assumption that breaks once PgBouncer's transaction pooling can hand successive statements to different backend connections.",
+      "title": "Fixing postgres.js 'prepared statement already exists' under PgBouncer",
+      "summary": "Covers postgres.js's own automatic-prepare feature specifically and its documented fix, `prepare: false`. Does not cover the PgBouncer-side 'does not exist' error or PgBouncer's own max_prepared_statements setting — that's a related but distinct incompatibility with a different remedy, covered in the PgBouncer prepared-statement playbook; the two are not interchangeable even though both involve prepared statements and PgBouncer.",
+      "symptoms": [
+        "postgres.js throws `PostgresError: prepared statement \"s0\" already exists` (or another sN name)",
+        "It only happens once traffic goes through PgBouncer — connecting straight to Postgres doesn't reproduce it",
+        "It's intermittent and worse under concurrent load"
+      ],
+      "signatures": [
+        { "errorCode": "42P05", "normalisedMessage": "error: prepared statement already exists", "languageHint": "javascript", "runtimeHint": "postgres-js" }
+      ],
+      "technologies": ["postgres-js", "pgbouncer"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "postgres.js reports a prepared statement already exists", "body": "This is specific to postgres.js's own automatic prepared-statement feature, not a generic Postgres or PgBouncer error message." },
+        { "id": "n2", "type": "test", "title": "Confirm transaction/statement pooling is in use and prepare wasn't already disabled", "body": "Check the postgres.js connection options for an explicit `prepare: false` — if absent, automatic prepare defaults to on. Also confirm PgBouncer's pool_mode via its admin console.", "command": "SHOW CONFIG;", "commandLanguage": "sql", "expectedOutput": " key        | value       | changeable \n------------+-------------+------------\n pool_mode  | transaction | yes\n(1 row)", "safetyLevel": "informational" },
+        { "id": "n3", "type": "root_cause", "title": "Automatic prepare assumes a stable server connection", "body": "postgres.js transparently prepares each distinct query text once per connection and reuses it by name on later calls. That assumption — that the same TCP connection always reaches the same Postgres backend — breaks under PgBouncer transaction (or statement) pooling, where each transaction can be handed a different backend process. postgres.js can end up trying to prepare a statement name on a backend where PgBouncer's own connection/prepared-statement bookkeeping doesn't match what postgres.js believes was prepared there, producing 'already exists' (the mirror-image failure, 'does not exist', comes from the same root incompatibility). This is a known limitation of client-side named prepared statements against transaction/statement-mode pooling in general, not something specific to one direction of the error." },
+        { "id": "n4", "type": "terminal", "title": "Not transaction/statement pooling, or prepare already off", "body": "If pool_mode is session and prepare wasn't disabled, this specific failure mode shouldn't occur — session pooling keeps a client on the same backend for its whole session. If it still reproduces under those conditions, something else is going on, outside this playbook." },
+        { "id": "n5", "type": "fix", "title": "Disable postgres.js's automatic prepared statements for pooled connections", "body": "Pass `prepare: false` when creating the postgres.js client that connects through PgBouncer. This makes postgres.js send plain queries instead of named prepared statements, which is safe under transaction pooling because there is no per-connection prepared-statement state for it to lose track of.", "command": "const sql = postgres(connectionString, { prepare: false });", "commandLanguage": "javascript", "safetyLevel": "informational" },
+        { "id": "n6", "type": "verification", "title": "Confirm the errors stop under pooled load", "body": "Re-run the workload against PgBouncer and watch for either 'already exists' or 'does not exist' prepared-statement errors from this client." },
+        { "id": "n7", "type": "terminal", "title": "Resolved", "body": "postgres.js is issuing plain queries against the pooled connection and the prepared-statement errors are gone." },
+        { "id": "n8", "type": "terminal", "title": "Still happening after disabling prepare", "body": "If disabling client-side prepare doesn't resolve it, another client sharing the same PgBouncer pool may still be issuing named prepared statements, or PgBouncer's own configuration needs attention — see the PgBouncer prepared-statement playbook. The two mechanisms are independent and, in a mixed-client environment, both may need adjusting." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n5", "to": "n6", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n6", "to": "n8", "condition": "failed" },
+        { "from": "n6", "to": "n8", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://github.com/porsager/postgres", "title": "postgres.js", "type": "other", "publisher": "porsager/postgres (GitHub)" },
+        { "url": "https://www.pgbouncer.org/config.html", "title": "PgBouncer 1.x - Configuration", "type": "official_docs", "publisher": "PgBouncer" }
+      ]
+    },
+    {
+      "slug": "node-pg-connect-timeout-pool-exhausted",
+      "problemTitle": "node-postgres: timeout exceeded when trying to connect",
+      "problemSummary": "node-postgres's Pool threw 'timeout exceeded when trying to connect' because either establishing a brand-new connection took longer than connectionTimeoutMillis, or every pooled connection was already checked out and a new request waited that long for one to free up — the message is identical for both.",
+      "title": "Diagnosing node-postgres connection timeouts at startup",
+      "summary": "Covers distinguishing pool exhaustion from a genuine reachability/auth failure, which node-postgres reports identically, and the immediate config-side responses to each. Does not cover a pool that starts healthy and exhausts gradually under sustained traffic from a code-level leak — that's the missing-release playbook, a different root cause with the same visible error.",
+      "symptoms": [
+        "`Error: timeout exceeded when trying to connect` thrown from Pool.connect or a query",
+        "Happens right at startup or under a burst of concurrent requests (e.g. parallel health checks)",
+        "Works fine with a single connection or at low concurrency"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "error: timeout exceeded when trying to connect", "languageHint": "javascript", "runtimeHint": "node-postgres" }
+      ],
+      "technologies": ["node-postgres"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "Pool.connect (or a query) timed out", "body": "node-postgres uses this same message and the same connectionTimeoutMillis both for establishing a brand-new physical connection and, in recent versions, for a caller waiting in the pool's internal queue for one to become available — so the message alone doesn't tell you which happened." },
+        { "id": "n2", "type": "test", "title": "Check whether the pool itself is the bottleneck", "body": "Sample the pool's own counters at (or just after) the moment of the timeout.", "command": "console.log({ total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount });", "commandLanguage": "javascript", "expectedOutput": "{ total: 10, idle: 0, waiting: 4 }", "safetyLevel": "informational" },
+        { "id": "n3", "type": "root_cause", "title": "The pool is maxed out and callers are queued", "body": "idleCount is 0, totalCount is at (or near) max, and waitingCount is above 0 — every connection is checked out and this caller is genuinely waiting for one. This is most often a burst of concurrent callers at startup (e.g. several parallel health checks or a stampede of cold starts) rather than a leak, since the pool was otherwise healthy moments before." },
+        { "id": "n4", "type": "root_cause", "title": "The pool never got a connection at all", "body": "If totalCount and idleCount are both near zero and nothing is genuinely waiting on pool capacity, the pool isn't the bottleneck — the underlying TCP/auth handshake itself is failing to complete in time. Check basic reachability from this exact environment (DNS resolution, firewall/security-group egress, TLS requirements) and that credentials are correct, e.g. with `psql` from the same host. That investigation is outside this playbook." },
+        { "id": "n5", "type": "fix", "title": "Raise max to match real peak concurrency, or serialise the startup burst", "body": "If many callers open connections concurrently at boot, either raise `max` to accommodate genuine peak concurrency, or make startup checks share a single connection/query rather than one each. Raising connectionTimeoutMillis alone is only a stopgap — it changes how long callers wait, not how many connections are available.", "command": "const pool = new Pool({ max: 20, connectionTimeoutMillis: 5000 });", "commandLanguage": "javascript", "safetyLevel": "informational" },
+        { "id": "n6", "type": "verification", "title": "Re-check pool counters under the same load pattern", "body": "Reproduce the same startup burst and sample again.", "command": "console.log({ total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount });", "commandLanguage": "javascript", "expectedOutput": "{ total: 20, idle: 6, waiting: 0 }", "safetyLevel": "informational" },
+        { "id": "n7", "type": "terminal", "title": "Resolved", "body": "waitingCount stays at 0 under the same burst that used to time out." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n5", "to": "n6", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n6", "to": "n4", "condition": "failed" },
+        { "from": "n6", "to": "n4", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://node-postgres.com/apis/pool", "title": "pg.Pool", "type": "official_docs", "publisher": "node-postgres" }
+      ]
+    },
+    {
+      "slug": "node-pg-pool-exhausted-missing-release",
+      "problemTitle": "node-postgres pool exhausts gradually because client.release() is never called",
+      "problemSummary": "A code path calls pool.connect() and never calls client.release() on every exit path, so each request through that path permanently consumes one pool slot until none are left.",
+      "title": "Finding and fixing a node-postgres connection leak",
+      "summary": "Covers the specific signature of a client-side leak — pool usage climbing steadily under sustained normal traffic rather than in a burst — and the try/finally fix. Does not cover a pool that's simply undersized for a legitimate concurrent burst at startup; that's the connect-timeout playbook, a different pattern in the same counters.",
+      "symptoms": [
+        "Fine at low traffic; after sustained requests, new queries start throwing `timeout exceeded when trying to connect` or hang",
+        "Restarting the process temporarily fixes it, and it recurs after roughly the same amount of traffic",
+        "The affected code calls pool.connect() directly rather than pool.query()"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "error: timeout exceeded when trying to connect", "languageHint": "javascript", "runtimeHint": "node-postgres" }
+      ],
+      "technologies": ["node-postgres"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "The pool exhausts gradually under sustained normal traffic", "body": "Unlike a startup burst, this climbs steadily over time under otherwise ordinary load and doesn't recover on its own." },
+        { "id": "n2", "type": "test", "title": "Watch the pool counters over time, not just once", "body": "Sample repeatedly across several minutes of normal traffic rather than at a single instant.", "command": "console.log({ total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount });", "commandLanguage": "javascript", "expectedOutput": "{ total: 10, idle: 0, waiting: 37 }", "safetyLevel": "informational" },
+        { "id": "n3", "type": "root_cause", "title": "idleCount stays at 0 and totalCount never drops — a leak, not a burst", "body": "If idleCount stays pinned at 0 and waitingCount keeps growing across ordinary, non-bursty traffic, connections are being checked out and never returned. Every `pool.connect()` must be matched with `client.release()`, including on every error path — a thrown/rejected query, an early return, or an unhandled exception between connect() and release() leaves that client permanently checked out, and the pool has no way to know it was abandoned. Note: `pool.query(...)` used without `.connect()` doesn't leak this way, since it acquires and releases a client for you automatically — the leak is specific to code that manually calls `pool.connect()`." },
+        { "id": "n4", "type": "terminal", "title": "Doesn't match the leak signature", "body": "If idleCount recovers between bursts and totalCount doesn't stay pinned at max, this may be genuine undersized capacity for a concurrency spike rather than a leak — see the connect-timeout playbook." },
+        { "id": "n5", "type": "fix", "title": "Wrap every manual checkout in try/finally", "body": "Guarantee release() runs on every exit path, including exceptions.", "command": "const client = await pool.connect();\ntry {\n  const result = await client.query(\"SELECT * FROM orders WHERE user_id = $1\", [userId]);\n  return result.rows;\n} finally {\n  client.release();\n}", "commandLanguage": "javascript", "safetyLevel": "informational" },
+        { "id": "n6", "type": "verification", "title": "Re-run the same sustained load and check the counters stay bounded", "body": "idleCount should fluctuate rather than stay pinned at 0, and waitingCount should stay near 0.", "command": "console.log({ total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount });", "commandLanguage": "javascript", "expectedOutput": "{ total: 10, idle: 6, waiting: 0 }", "safetyLevel": "informational" },
+        { "id": "n7", "type": "terminal", "title": "Resolved", "body": "Pool usage no longer climbs unbounded under sustained traffic." },
+        { "id": "n8", "type": "fix", "title": "Search for other manual .connect() call sites", "body": "A single other place in the codebase that calls pool.connect() without a matching try/finally reproduces the exact same symptom. Search the whole codebase for pool.connect( rather than assuming the one fixed instance was the only one." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n5", "to": "n6", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n6", "to": "n8", "condition": "failed" },
+        { "from": "n6", "to": "n8", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://node-postgres.com/apis/pool", "title": "pg.Pool", "type": "official_docs", "publisher": "node-postgres" },
+        { "url": "https://node-postgres.com/apis/client", "title": "pg.Client", "type": "official_docs", "publisher": "node-postgres" }
+      ]
+    },
+    {
+      "slug": "prisma-client-initialization-error-connection-string",
+      "problemTitle": "PrismaClientInitializationError right after deploy, works fine locally",
+      "problemSummary": "new PrismaClient() fails to initialize because the connection string it reads from the environment is missing, misnamed, or malformed in the deploy environment even though a working one exists locally.",
+      "title": "Fixing PrismaClientInitializationError from a missing or bad connection string",
+      "summary": "Covers environment/connection-string configuration specifically: the string never reaching the deploy environment, a name mismatch against what schema.prisma expects, or unescaped special characters. Does not cover P1001 (a valid-looking connection string that simply can't reach the server over the network) — that's a separate playbook — and does not cover query engine binary/platform mismatches beyond flagging them as a possibility.",
+      "symptoms": [
+        "`new PrismaClient()` (or the first query) throws PrismaClientInitializationError immediately",
+        "It works with `npx prisma studio` or any command run locally, but fails as soon as it's deployed",
+        "No query ever gets a chance to run before the error"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "prismaclientinitializationerror", "languageHint": "javascript", "runtimeHint": "prisma" }
+      ],
+      "technologies": ["prisma"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "PrismaClientInitializationError only in the deployed environment", "body": "The client fails before any query runs, which points at initialization-time configuration rather than a query or schema problem." },
+        { "id": "n2", "type": "test", "title": "Confirm the env var Prisma expects is actually set in the deploy environment", "body": "Run this inside the same environment/container that's failing — not locally.", "command": "node -e \"console.log(process.env.DATABASE_URL)\"", "commandLanguage": "bash", "expectedOutput": "postgresql://appuser:********@db.internal:5432/appdb?sslmode=require", "safetyLevel": "credential_sensitive", "safetyEffect": "Prints the full connection string, including the database password, to standard output. Run it only in a trusted terminal, and never paste the raw output into chat, a ticket, or a log without redacting the password first." },
+        { "id": "n3", "type": "test", "title": "Check whether the connection string is well-formed and matches what schema.prisma expects", "body": "Confirm the printed variable name matches exactly what schema.prisma's `datasource db { url = env(\"...\") }` references — this is case-sensitive and easy to typo (e.g. DATABASE_URL vs POSTGRES_URL). Also confirm any special characters in the username/password (@, :, /, #, etc.) are percent-encoded, since an unescaped character can silently corrupt how the URL is parsed." },
+        { "id": "n4", "type": "root_cause", "title": "The env var never made it into this environment", "body": "Local `.env` files are not automatically deployed. Most platforms — containers, serverless, CI — require secrets to be configured explicitly in the platform's own environment/secrets settings. A variable present in `.env` locally and absent in the deploy target is the single most common cause of this error appearing only after deploy." },
+        { "id": "n5", "type": "root_cause", "title": "Connection string looks fine — likely not a configuration issue", "body": "If the string reaches Prisma correctly and is well-formed, the initialization failure more likely comes from the query engine binary itself — for example a missing `binaryTargets` entry in schema.prisma for the deploy OS/architecture (musl/Alpine containers are the common case). Diagnosing that is outside this playbook." },
+        { "id": "n6", "type": "root_cause", "title": "Connection string is malformed or points at the wrong variable name", "body": "Either the variable name doesn't match what schema.prisma reads, or a special character in the credentials isn't percent-encoded." },
+        { "id": "n7", "type": "fix", "title": "Set the correct, correctly-encoded connection string in the deploy environment", "body": "Add or correct the environment variable in the platform's own secret/environment configuration — not just .env — using the exact name schema.prisma expects, and percent-encode any special characters in the password (e.g. `p@ss:word/1` becomes `p%40ss%3Aword%2F1`).", "command": "DATABASE_URL=\"postgresql://appuser:p%40ssw0rd@db.internal:5432/appdb?sslmode=require\"", "commandLanguage": "bash", "safetyLevel": "credential_sensitive", "safetyEffect": "Sets a database connection string containing a plaintext password as an environment variable. Store it in the platform's secret manager rather than committing it anywhere, and rotate the password if this value is ever pasted somewhere shared." },
+        { "id": "n8", "type": "verification", "title": "Confirm the client initializes", "body": "Run in the same deploy environment.", "command": "node -e \"const { PrismaClient } = require('@prisma/client'); new PrismaClient().$connect().then(() => { console.log('connected'); process.exit(0); }).catch((e) => { console.error(e); process.exit(1); });\"", "commandLanguage": "bash", "expectedOutput": "connected", "safetyLevel": "informational" },
+        { "id": "n9", "type": "terminal", "title": "Resolved", "body": "The client initializes and connects in the deploy environment." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n3", "to": "n6", "condition": "failed" },
+        { "from": "n3", "to": "n6", "condition": "unknown" },
+        { "from": "n4", "to": "n7", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n8", "to": "n9", "condition": "passed" },
+        { "from": "n8", "to": "n5", "condition": "failed" },
+        { "from": "n8", "to": "n5", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://www.prisma.io/docs/orm/reference/error-reference", "title": "Error reference", "type": "official_docs", "publisher": "Prisma" },
+        { "url": "https://www.prisma.io/docs/orm/reference/connection-urls", "title": "Connection URLs", "type": "official_docs", "publisher": "Prisma" }
+      ]
+    },
+    {
+      "slug": "prisma-p1001-cant-reach-database-server",
+      "problemTitle": "Prisma P1001: Can't reach database server at host:port",
+      "problemSummary": "Prisma parsed a valid connection string but the TCP connection to the named host and port failed — a network reachability problem, not a configuration-string problem.",
+      "title": "Diagnosing Prisma P1001 (can't reach database server)",
+      "summary": "Covers confirming basic network reachability to the named host:port and the usual reasons it's blocked. Does not cover a missing or malformed connection string (see the PrismaClientInitializationError playbook) — by the time you have a specific host:port in the error, the string was parsed successfully.",
+      "symptoms": [
+        "PrismaClientInitializationError with the message \"Can't reach database server at `host:port`\"",
+        "Error code P1001",
+        "The host and port named in the error are printed directly from the parsed connection string"
+      ],
+      "signatures": [
+        { "errorCode": "P1001", "normalisedMessage": "error: can't reach database server", "languageHint": "javascript", "runtimeHint": "prisma" }
+      ],
+      "technologies": ["prisma"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "P1001: can't reach database server at a specific host:port", "body": "The string parsed fine — Prisma is telling you exactly which host and port it tried and failed to reach." },
+        { "id": "n2", "type": "test", "title": "Can you reach that exact host and port from the same environment?", "body": "Run from inside the deploy environment, not from your local machine.", "command": "nc -zv db.internal 5432", "commandLanguage": "bash", "expectedOutput": "Connection to db.internal 5432 port [tcp/postgresql] succeeded!", "safetyLevel": "informational" },
+        { "id": "n3", "type": "root_cause", "title": "Network path is open — Postgres itself is refusing or dropping it", "body": "Check that Postgres is actually running and listening on that interface (listen_addresses), that pg_hba.conf allows this client's address/user/database combination, and that the port matches — managed providers sometimes use a different port for a pooled connection than a direct one (e.g. Supabase's pooler on 6543 vs 5432 direct)." },
+        { "id": "n4", "type": "root_cause", "title": "The network path itself is blocked or misconfigured", "body": "For a managed/cloud database this is most often: the deploy environment's egress IPs aren't allow-listed by the database's firewall/security group, the hostname is a private/internal DNS name that only resolves inside a VPC while this deploy runs outside it (e.g. serverless or edge), or the database is paused/down." },
+        { "id": "n5", "type": "fix", "title": "Fix reachability at its actual layer", "body": "Depending on which of the above applies: allow-list the deploy environment's egress IPs in the database's firewall/security group; if the host is private-DNS-only, connect through whatever the provider requires for external access (a public endpoint, a proxy such as Cloudflare Hyperdrive or PgBouncer, or VPN/peering); or if Postgres itself is down, restart it and re-check pg_hba.conf. There's no single universal command — the blockage differs per environment." },
+        { "id": "n6", "type": "verification", "title": "Retry the same reachability check", "body": "Confirm the port opens now.", "command": "nc -zv db.internal 5432", "commandLanguage": "bash", "expectedOutput": "Connection to db.internal 5432 port [tcp/postgresql] succeeded!", "safetyLevel": "informational" },
+        { "id": "n7", "type": "terminal", "title": "Resolved", "body": "The port is reachable and Prisma can now initialize its connection." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n4", "to": "n5", "condition": "passed" },
+        { "from": "n5", "to": "n6", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n6", "to": "n4", "condition": "failed" },
+        { "from": "n6", "to": "n4", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://www.prisma.io/docs/orm/reference/error-reference", "title": "Error reference", "type": "official_docs", "publisher": "Prisma" }
+      ]
+    },
+    {
+      "slug": "prisma-p2002-unique-constraint-violation",
+      "problemTitle": "Prisma P2002: Unique constraint failed",
+      "problemSummary": "prisma.<model>.create() (or update) violated a unique constraint, and Prisma surfaced it as a PrismaClientKnownRequestError with code P2002 naming the affected field(s).",
+      "title": "Handling Prisma P2002 unique constraint violations",
+      "summary": "Covers recognising that P2002 is Postgres's unique constraint doing its job, correctly, and the two idiomatic ways to handle an expected duplicate. Does not cover tracing where an unexpected duplicate came from (a retry without an idempotency key, a double-fired webhook, a bad backfill) — this playbook only gets you to recognising which situation you're in.",
+      "symptoms": [
+        "`PrismaClientKnownRequestError` thrown from create() or update()",
+        "Message: \"Unique constraint failed on the fields: (`email`)\"",
+        "`code: 'P2002'` on the caught error"
+      ],
+      "signatures": [
+        { "errorCode": "P2002", "normalisedMessage": "unique constraint failed on the fields", "languageHint": "javascript", "runtimeHint": "prisma" }
+      ],
+      "technologies": ["prisma", "postgresql"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "PrismaClientKnownRequestError P2002", "body": "Prisma's create() (or update()) was rejected because the row it tried to write conflicts with a unique index or constraint. This is Postgres's own uniqueness check firing — Prisma is just the messenger." },
+        { "id": "n2", "type": "test", "title": "Is this an expected duplicate, or a bug in how the record is being created?", "body": "Check whether the request is a legitimate retry or double-submission (a form double-click, a client retrying without an idempotency key) versus code that shouldn't be able to produce a duplicate at all." },
+        { "id": "n3", "type": "root_cause", "title": "Prisma is correctly enforcing the constraint — handle it instead of preventing it", "body": "A SELECT-then-INSERT check in application code cannot prevent this under concurrency: two requests can both pass the SELECT before either INSERTs, a classic check-then-act race. The constraint violation is Postgres doing exactly what it's for — the fix is to catch the specific error code and respond appropriately, or use upsert." },
+        { "id": "n4", "type": "root_cause", "title": "An unexpected duplicate means something upstream is wrong", "body": "If a duplicate genuinely shouldn't be possible here, check whether the caller retries without an idempotency key, whether a migration/backfill inserted the conflicting row, or whether two code paths (e.g. a webhook handler firing twice for the same event) can both attempt to create the same logical entity. Tracing the specific upstream duplicate is outside this playbook — it only gets you to recognising that P2002 means one already exists." },
+        { "id": "n5", "type": "fix", "title": "Catch P2002 explicitly, or switch to upsert", "body": "Catch the specific error code rather than letting it propagate as an unhandled exception.", "command": "try {\n  await prisma.user.create({ data: { email: input.email, name: input.name } });\n} catch (err) {\n  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === \"P2002\") {\n    return { error: \"email already registered\" };\n  }\n  throw err;\n}", "commandLanguage": "javascript", "safetyLevel": "informational" },
+        { "id": "n6", "type": "verification", "title": "Confirm duplicates are now handled without an unhandled exception", "body": "Re-run the same create() request twice with the same unique field and confirm the second attempt returns the handled response rather than an uncaught P2002." },
+        { "id": "n7", "type": "terminal", "title": "Resolved", "body": "Duplicate submissions now return a handled response instead of crashing the request." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n5", "to": "n6", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n6", "to": "n4", "condition": "failed" },
+        { "from": "n6", "to": "n4", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://www.prisma.io/docs/orm/reference/error-reference", "title": "Error reference", "type": "official_docs", "publisher": "Prisma" }
+      ]
+    },
+    {
+      "slug": "supabase-rls-policy-violation-insert",
+      "problemTitle": "Supabase: new row violates row-level security policy (INSERT)",
+      "problemSummary": "Row-level security is enabled on the table, and no permissive INSERT policy (or none whose WITH CHECK expression matches) applies to the role the client is using, so Postgres rejects the insert even though it works from the SQL editor.",
+      "title": "Diagnosing a Supabase RLS INSERT rejection",
+      "summary": "Covers confirming which policies exist and why WITH CHECK is rejecting the row, and adding a correct INSERT policy. Does not cover RLS for SELECT/UPDATE/DELETE (governed by USING, a different clause) or auth/JWT configuration beyond noting that the SQL editor bypasses RLS entirely and so can never be used to test a policy.",
+      "symptoms": [
+        "Inserts from the app (signed-in user) fail with `new row violates row-level security policy for table \"...\"`",
+        "The exact same insert succeeds when run from the Supabase SQL editor",
+        "The table has RLS enabled"
+      ],
+      "signatures": [
+        { "errorCode": "42501", "normalisedMessage": "new row violates row-level security policy", "languageHint": "sql", "runtimeHint": "postgres" }
+      ],
+      "technologies": ["supabase", "postgresql"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "RLS is rejecting an INSERT the app performs, but the SQL editor succeeds", "body": "That contrast is itself the clue: the SQL editor runs as a privileged role that bypasses RLS entirely (the same is true of a server-side call using the service_role key), so it proves nothing about whether a real app-facing policy exists — it will 'work' even with zero policies on the table." },
+        { "id": "n2", "type": "test", "title": "Confirm RLS is enabled and see what policies exist", "body": "List every policy on the table, regardless of which command it covers.", "command": "SELECT policyname, cmd, roles, qual, with_check\nFROM pg_policies\nWHERE schemaname = 'public' AND tablename = 'orders';", "commandLanguage": "sql", "expectedOutput": " policyname                  | cmd    | roles           | qual | with_check \n------------------------------+--------+-----------------+------+------------\n users can view own orders   | SELECT | {authenticated} | ...  | \n(1 row)", "safetyLevel": "informational" },
+        { "id": "n3", "type": "test", "title": "Does an INSERT-covering policy's WITH CHECK actually match this row and role?", "body": "The SQL editor can't be used to test this — it bypasses RLS entirely, so it will 'succeed' whether or not a real policy exists. Instead test with the app's actual signed-in session (or temporarily add logging), and check whether the WITH CHECK expression (commonly something like `auth.uid() = user_id`) really matches the value being inserted for that column." },
+        { "id": "n4", "type": "root_cause", "title": "No policy permits this INSERT at all", "body": "With RLS enabled, Postgres denies every operation by default unless an applicable permissive policy exists for that operation and role. A table with only a SELECT policy (or no policies at all) rejects every INSERT from anon/authenticated roles — while postgres/service_role bypasses RLS entirely and never hits this, which is exactly why the SQL editor 'works fine'." },
+        { "id": "n5", "type": "root_cause", "title": "Policy logic looks correct — check which key/role the client is actually using", "body": "If a matching INSERT policy exists and its WITH CHECK genuinely matches the row when tested as the signed-in user, the real app may not be sending that user's session at all — for example calling the API with the anon key without an authenticated session, or a server-side call quietly using the anon key instead of a user's JWT. In that case auth.uid() evaluates to null and can never match. Diagnosing that further is outside this playbook." },
+        { "id": "n6", "type": "root_cause", "title": "WITH CHECK doesn't match how the row is actually being inserted", "body": "Common mistakes: comparing auth.uid() (uuid) against a column of the wrong type, a column that isn't actually populated with the current user before the check runs, or an ownership column set by a trigger that runs after RLS is evaluated. Also check that WITH CHECK is set at all — USING alone controls visibility for SELECT/UPDATE/DELETE; INSERT is governed solely by WITH CHECK." },
+        { "id": "n7", "type": "fix", "title": "Add or correct the INSERT policy", "body": "Example: allow authenticated users to insert only rows that belong to themselves.", "command": "CREATE POLICY \"users can insert their own orders\"\nON public.orders\nFOR INSERT\nTO authenticated\nWITH CHECK (auth.uid() = user_id);", "commandLanguage": "sql", "safetyLevel": "state_changing", "safetyEffect": "Adds a new row-level security policy to the orders table. It does not change any existing data or existing policies — it only permits INSERTs that satisfy the WITH CHECK condition for the authenticated role, going forward." },
+        { "id": "n8", "type": "verification", "title": "Re-check the policy exists, then re-test as a real signed-in user", "body": "Confirm the new policy is present.", "command": "SELECT policyname, cmd, roles, qual, with_check\nFROM pg_policies\nWHERE schemaname = 'public' AND tablename = 'orders';", "commandLanguage": "sql", "expectedOutput": " policyname                     | cmd    | roles            | qual | with_check \n---------------------------------+--------+------------------+------+-------------------\n users can insert their own...  | INSERT | {authenticated}  |      | (auth.uid() = ...)\n(2 rows)", "safetyLevel": "informational" },
+        { "id": "n9", "type": "terminal", "title": "Resolved", "body": "The signed-in user's own insert succeeds, and inserts for other users' rows are still correctly rejected." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n3", "to": "n6", "condition": "failed" },
+        { "from": "n3", "to": "n6", "condition": "unknown" },
+        { "from": "n4", "to": "n7", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n8", "to": "n9", "condition": "passed" },
+        { "from": "n8", "to": "n5", "condition": "failed" },
+        { "from": "n8", "to": "n5", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://supabase.com/docs/guides/database/postgres/row-level-security", "title": "Row Level Security", "type": "official_docs", "publisher": "Supabase" }
+      ]
+    },
+    {
+      "slug": "neon-websocket-connection-failed-serverless",
+      "problemTitle": "Neon serverless driver: all attempts to open a WebSocket to connect to the database failed",
+      "problemSummary": "@neondatabase/serverless talks to Postgres through Neon's WebSocket proxy rather than a raw TCP socket, because edge runtimes like Cloudflare Workers can't open arbitrary outbound TCP — and every attempt to open that WebSocket failed.",
+      "title": "Diagnosing Neon serverless driver WebSocket connection failures",
+      "summary": "Covers the two things this error almost always traces back to — a connection string or driver entry point that isn't the one meant for this runtime, and isolating whether the failure is Worker-specific. Does not cover general Postgres server-side connection issues once the WebSocket itself connects successfully — those are covered by the general Postgres playbooks.",
+      "symptoms": [
+        "`Error: All attempts to open a WebSocket to connect to the database failed` from @neondatabase/serverless",
+        "Happens specifically inside an edge runtime such as Cloudflare Workers",
+        "The same-looking code may work fine in a regular Node.js process"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "all attempts to open a websocket to connect to the database failed", "languageHint": "javascript", "runtimeHint": "neon" }
+      ],
+      "technologies": ["neon", "cloudflare-workers"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "Every WebSocket attempt to Neon failed", "body": "@neondatabase/serverless is built for runtimes, like Cloudflare Workers, that cannot open a raw outbound TCP connection to Postgres — it instead connects through Neon's own WebSocket proxy. This error means every attempt at that WebSocket handshake failed." },
+        { "id": "n2", "type": "test", "title": "Confirm the connection string is the one Neon issues for this project, unmodified", "body": "Copy it directly from the Neon project dashboard's connection details rather than reusing a generic postgres:// string meant for a raw TCP client like psql or node-postgres, and rather than hand-editing it." },
+        { "id": "n3", "type": "test", "title": "Does the same code and connection string work outside the Worker?", "body": "Run the identical query against the identical connection string from a plain Node.js process (with a WebSocket implementation available). If it works there but not inside the deployed Worker, the issue is specific to the Worker runtime rather than the credentials or endpoint." },
+        { "id": "n4", "type": "root_cause", "title": "Wrong connection string or credentials", "body": "The string doesn't match what Neon currently issues for this project/branch — it may have been copied from an old branch, a different project, or edited by hand and had something break in the process." },
+        { "id": "n5", "type": "root_cause", "title": "Something in the Worker environment specifically is misconfigured", "body": "Check that the code imports the driver's default export meant for edge runtimes rather than a Node-targeted entry point, and that nothing is calling `neonConfig.webSocketConstructor` unnecessarily inside the Worker — Workers provide a native global WebSocket, and forcing a Node `ws` polyfill there can break the handshake instead of fixing it. Also rule out the Worker hitting its own CPU/wall-clock limit before the handshake completes." },
+        { "id": "n6", "type": "fix", "title": "Use the connection string and driver import Neon issues for this runtime, unmodified", "body": "Copy the connection string straight from the Neon dashboard, import the driver's default export, and don't set neonConfig.webSocketConstructor unless running in a non-edge Node process that lacks a native WebSocket.", "command": "import { neon } from \"@neondatabase/serverless\";\nconst sql = neon(process.env.DATABASE_URL);\nconst rows = await sql`SELECT 1`;", "commandLanguage": "javascript", "safetyLevel": "informational" },
+        { "id": "n7", "type": "verification", "title": "Confirm the query succeeds from inside the deployed Worker", "body": "Deploy and run the same query from the actual Worker, not just locally, and confirm it returns without the WebSocket error." },
+        { "id": "n8", "type": "terminal", "title": "Resolved", "body": "Queries succeed from the deployed Worker using Neon's own connection string and the edge-runtime driver entry point." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n3", "to": "n4", "condition": "failed" },
+        { "from": "n3", "to": "n4", "condition": "unknown" },
+        { "from": "n4", "to": "n6", "condition": "passed" },
+        { "from": "n5", "to": "n6", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n7", "to": "n5", "condition": "failed" },
+        { "from": "n7", "to": "n5", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://neon.tech/docs/serverless/serverless-driver", "title": "Neon serverless driver", "type": "official_docs", "publisher": "Neon" }
+      ]
+    },
+    {
+      "slug": "docker-compose-v2-config-file-not-found",
+      "problemTitle": "docker compose: no configuration file provided: not found",
+      "problemSummary": "Compose V2, run as the `docker compose` CLI plugin, looks only for compose.yaml, compose.yml, docker-compose.yaml or docker-compose.yml in the current directory by default, and none of those exist there (or the invocation changed from what Compose V1 tolerated).",
+      "title": "Fixing 'no configuration file provided: not found' after migrating to Compose V2",
+      "summary": "Covers Compose V2's default file-discovery rule and the invocation mismatches that commonly break after a V1-to-V2 migration. Does not cover Compose file syntax/schema errors once a file is actually found and parsed.",
+      "symptoms": [
+        "`no configuration file provided: not found` when running `docker compose ...`",
+        "Started after switching from the standalone `docker-compose` (V1) binary to the `docker compose` plugin (V2)",
+        "The compose file exists somewhere in the project but the error still appears"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "no configuration file provided: not found", "languageHint": "bash", "runtimeHint": "docker-compose" }
+      ],
+      "technologies": ["docker-compose"],
+      "constraints": [
+        { "technology": "docker-compose", "minSemver": "00002.00000.00000", "maxSemver": null, "maxInclusive": false, "kind": "required" }
+      ],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "Compose V2 can't find a configuration file", "body": "Compose V2 is a `docker` CLI plugin (`docker compose`), not the old standalone `docker-compose` binary, and it is stricter about failing loudly rather than searching parent directories the way some V1 setups did." },
+        { "id": "n2", "type": "test", "title": "Is there actually a compose file in the current working directory?", "body": "Compose V2 looks only for these four names, in this directory, by default.", "command": "ls -1 compose.yaml compose.yml docker-compose.yaml docker-compose.yml 2>/dev/null", "commandLanguage": "bash", "expectedOutput": "docker-compose.yml", "safetyLevel": "informational" },
+        { "id": "n3", "type": "test", "title": "Is the command run from the file's directory, with no conflicting -f pointing elsewhere?", "body": "V1 scripts/CI steps sometimes relied on an implicit working directory, or an old -f path baked into a wrapper script, that Compose V2 doesn't replicate the same way." },
+        { "id": "n4", "type": "root_cause", "title": "No compose file exists under any of the four default names", "body": "If your file is named something else — e.g. docker-compose.local.yml — Compose V2 will never find it automatically; it must be passed explicitly with -f." },
+        { "id": "n5", "type": "root_cause", "title": "Invocation and file placement look correct", "body": "Check file permissions, whether it's a broken symlink, or whether a CI checkout step skipped it (e.g. via .dockerignore or a sparse checkout) — outside this playbook's scope beyond flagging it." },
+        { "id": "n6", "type": "root_cause", "title": "The command isn't being run from where the file actually lives", "body": "The script or CI step's working directory changed, or it's using a leftover -f path from before the migration." },
+        { "id": "n7", "type": "fix", "title": "Run from the right directory, or pass the file explicitly", "body": "Point -f directly at the file rather than relying on the default discovery.", "command": "docker compose -f ./deploy/docker-compose.yml up -d", "commandLanguage": "bash", "safetyLevel": "state_changing", "safetyEffect": "Starts (or recreates) the containers defined in the given compose file, in detached mode. Existing containers for this project may be stopped and replaced; named volumes are preserved." },
+        { "id": "n8", "type": "verification", "title": "Confirm compose finds and parses the file", "body": "This renders the fully merged configuration without starting anything, and fails the same way `up` would if the file still isn't found.", "command": "docker compose config", "commandLanguage": "bash", "expectedOutput": "services:\n  api:\n    image: app/api:latest\n    ports:\n      - \"3000:3000\"", "safetyLevel": "informational" },
+        { "id": "n9", "type": "terminal", "title": "Resolved", "body": "Compose finds and parses the file from this invocation." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n3", "to": "n6", "condition": "failed" },
+        { "from": "n3", "to": "n6", "condition": "unknown" },
+        { "from": "n4", "to": "n7", "condition": "passed" },
+        { "from": "n6", "to": "n7", "condition": "passed" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n8", "to": "n9", "condition": "passed" },
+        { "from": "n8", "to": "n5", "condition": "failed" },
+        { "from": "n8", "to": "n5", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://docs.docker.com/compose/", "title": "Docker Compose", "type": "official_docs", "publisher": "Docker" }
+      ]
+    },
+    {
+      "slug": "node-heap-out-of-memory",
+      "problemTitle": "Node process crashes with JavaScript heap out of memory despite the container having RAM to spare",
+      "problemSummary": "V8 hit its own heap ceiling and crashed with a FATAL ERROR, which is a limit V8 enforces on itself and is not automatically kept in sync with the container's cgroup memory limit — so the crash can happen well before the container's own memory limit is reached.",
+      "title": "Diagnosing a V8 heap-limit crash that isn't a container OOM-kill",
+      "summary": "Covers telling a V8 heap-limit crash apart from a container/orchestrator OOM-kill (a different failure with no application log line at all), and the two independent responses: raising V8's ceiling versus finding a leak. Does not cover Kubernetes OOMKilled pod eviction — that's a distinct failure mode, at a different layer, with its own playbook, even though both are commonly described as 'ran out of memory'.",
+      "symptoms": [
+        "`FATAL ERROR: ... JavaScript heap out of memory` (or 'Allocation failed - JavaScript heap out of memory') printed before the process exits",
+        "A V8 heap statistics / stack dump is printed alongside it",
+        "The container's or orchestrator's own memory limit shows headroom at the time of the crash"
+      ],
+      "signatures": [
+        { "errorCode": null, "normalisedMessage": "fatal error: javascript heap out of memory", "languageHint": "javascript", "runtimeHint": "v8" }
+      ],
+      "technologies": ["nodejs", "v8"],
+      "nodes": [
+        { "id": "n1", "type": "start", "title": "V8 crashed with a heap-out-of-memory FATAL ERROR", "body": "The process printed this specific message and a heap dump before exiting, and the container's own memory limit (docker stats, cgroups, or the orchestrator) shows it was never approached." },
+        { "id": "n2", "type": "test", "title": "Confirm this is V8's own heap ceiling, not the container being killed", "body": "A container/cgroup OOM-kill terminates the process abruptly with SIGKILL (exit code 137) and no application-level log line at all — the process never gets a chance to print anything. A V8 heap-limit crash, by contrast, always prints the FATAL ERROR line and a heap statistics dump, because V8 caught its own allocation failure before exiting.", "command": "echo $?", "commandLanguage": "bash", "expectedOutput": "1", "safetyLevel": "informational" },
+        { "id": "n3", "type": "root_cause", "title": "V8's heap ceiling is independent of the container's memory limit", "body": "V8 picks a default old-space heap ceiling that is not automatically the same as the container's cgroup memory limit. Even on Node versions where V8 sizes itself against available memory at startup, that sizing happens once at boot, won't grow later even if more memory becomes available, and can still land below the container's true limit depending on how the container reports available memory to the process. The two limits are enforced by different layers and are not kept in sync automatically." },
+        { "id": "n4", "type": "terminal", "title": "This is a container/orchestrator OOM-kill instead", "body": "No V8 heap message, just an abrupt kill with exit code 137 — that failure has no application-level log line at all, because the kernel kills the process rather than the process catching an allocation failure. That's a different problem, at a different layer, than this playbook covers." },
+        { "id": "n5", "type": "test", "title": "Does memory grow without bound over time, or spike sharply during one operation?", "body": "Sample memory usage periodically across many requests, not just once.", "command": "setInterval(() => console.log(process.memoryUsage()), 30000);", "commandLanguage": "javascript", "expectedOutput": "{ rss: 612000000, heapTotal: 480000000, heapUsed: 471000000, external: 9000000, arrayBuffers: 2000000 }", "safetyLevel": "informational" },
+        { "id": "n6", "type": "root_cause", "title": "Likely a memory leak, not a sizing problem", "body": "Raising --max-old-space-size only delays this crash if references are genuinely being retained forever — e.g. a module-level array or Map that's only ever pushed to, event listeners added without matching removal, or closures capturing large objects long after they're needed. Finding the leak itself, e.g. with --inspect and heap snapshots, is outside what this playbook covers." },
+        { "id": "n7", "type": "fix", "title": "Raise V8's heap ceiling to match the container, or stop buffering the whole payload in memory", "body": "Two independent options: set --max-old-space-size explicitly to a value comfortably below the container's actual memory limit, leaving headroom for V8's other memory areas and the OS; and/or change the specific operation to stream data instead of loading it wholesale (e.g. a large query result set or file read in one go).", "command": "node --max-old-space-size=3072 server.js", "commandLanguage": "bash", "safetyLevel": "informational" },
+        { "id": "n8", "type": "verification", "title": "Confirm the crash stops under the same workload", "body": "Re-run the same operation/load pattern and confirm there's no further heap-out-of-memory crash, and that the container's own memory limit is still respected rather than trading this crash for a container-level OOM-kill instead." },
+        { "id": "n9", "type": "terminal", "title": "Resolved", "body": "The workload completes without a V8 heap crash, within the raised ceiling and within the container's own limit." }
+      ],
+      "edges": [
+        { "from": "n1", "to": "n2", "condition": "passed" },
+        { "from": "n2", "to": "n3", "condition": "passed" },
+        { "from": "n2", "to": "n4", "condition": "failed" },
+        { "from": "n2", "to": "n4", "condition": "unknown" },
+        { "from": "n3", "to": "n5", "condition": "passed" },
+        { "from": "n5", "to": "n6", "condition": "passed" },
+        { "from": "n5", "to": "n7", "condition": "failed" },
+        { "from": "n5", "to": "n7", "condition": "unknown" },
+        { "from": "n7", "to": "n8", "condition": "passed" },
+        { "from": "n8", "to": "n9", "condition": "passed" },
+        { "from": "n8", "to": "n6", "condition": "failed" },
+        { "from": "n8", "to": "n6", "condition": "unknown" }
+      ],
+      "sources": [
+        { "url": "https://nodejs.org/api/cli.html", "title": "Command-line API", "type": "official_docs", "publisher": "Node.js" }
+      ]
+    }
+  ]
+}
