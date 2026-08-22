@@ -1,0 +1,21 @@
+{
+  "name": "@devyou/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "description": "End-to-end, accessibility and visual test suite for the deployed DevYou site",
+  "type": "module",
+  "scripts": {
+    "e2e": "playwright test",
+    "e2e:staging": "playwright test",
+    "e2e:ui": "playwright test --ui",
+    "test": "echo \"[e2e] run explicitly with pnpm run e2e\"",
+    "test:unit": "echo \"[e2e] no unit tests\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^22.19.1",
+    "typescript": "~5.9.3"
+  }
+}

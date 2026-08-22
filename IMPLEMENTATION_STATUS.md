@@ -28,17 +28,17 @@ A successful build is not `TESTED`. A successful `wrangler deploy` is not
 | 0 | Repository + existing-network audit | **VERIFIED** — gate passed |
 | 1 | Monorepo + design system | **VERIFIED STAGING** (visual gate deferred — see below) |
 | 2 | Database and domain invariants | **VERIFIED STAGING** |
-| 3 | Public landing + search baseline | `IN PROGRESS` |
-| 4 | Playbook reader + diagnostic engine | `NOT STARTED` |
-| 5 | Environment + evidence UX | `NOT STARTED` |
-| 6 | Authentication + contributor identity | `NOT STARTED` |
-| 7 | Contribution pipeline + AI structuring | `NOT STARTED` |
-| 8 | Reproduction + micro-contribution | `NOT STARTED` |
-| 9 | Revisioning, deprecation, staleness | `NOT STARTED` |
+| 3 | Public landing + search baseline | **VERIFIED STAGING** — benchmark passed |
+| 4 | Playbook reader + diagnostic engine | **VERIFIED STAGING** |
+| 5 | Environment + evidence UX | **VERIFIED STAGING** |
+| 6 | Authentication + contributor identity | **VERIFIED STAGING** (unconfigured path; OAuth round-trip blocked on A0-4) |
+| 7 | Contribution pipeline + AI structuring | `IN PROGRESS` — proposals ship; drafting pipeline does not |
+| 8 | Reproduction + micro-contribution | **VERIFIED STAGING** |
+| 9 | Revisioning, deprecation, staleness | `IMPLEMENTED` — untested for multi-revision, corpus has none |
 | 10 | Dev Admin module | `NOT STARTED` |
-| 11 | Security hardening | `NOT STARTED` |
-| 12 | SEO, accessibility, performance, search quality | `NOT STARTED` |
-| 13 | Seed corpus + closed validation | `NOT STARTED` |
+| 11 | Security hardening | `IN PROGRESS` |
+| 12 | SEO, accessibility, performance, search quality | `IN PROGRESS` — a11y + crawl done, performance unmeasured |
+| 13 | Seed corpus + closed validation | `IN PROGRESS` — corpus seeded, validation not run |
 | 14 | Staging freeze + launch gate | `NOT STARTED` |
 
 **Deployed:** `devyou-app-staging` on `https://dev-staging.itisyou.app`.
@@ -212,3 +212,218 @@ still be accepted. A guard that blocks everything is not a guard, it is an outag
 aliases carry the error tokens that pasted output actually contains — `SQLITE_BUSY`,
 `CrashLoopBackOff`, `SQLSTATE 40001` — which is what lets a pasted error resolve to a
 technology at all.
+
+---
+
+## Phase 3 — Public landing + search baseline
+
+**State: VERIFIED STAGING.** The plan's gate — *"a pasted error resolves to the right
+playbook"* — was measured, not asserted.
+
+Benchmarked against the deployed staging Worker with 57 labelled queries across four
+input shapes: **MRR 0.809, hit@3 88.9% (target ≥70%), zero-result 9.3% (ceiling 15%),
+false-positive 0.0% (ceiling 34%)**. Evidence:
+[`docs/evidence/search-benchmark-2026-08-22.txt`](docs/evidence/search-benchmark-2026-08-22.txt).
+Design and trade-offs: [ADR-0008](docs/decisions/0008-search-baseline.md).
+
+### Two defects the benchmark surfaced
+
+1. **A 500 on every natural-language query**, from binding the candidate list three
+   times while using numbered placeholders `?1..?N` — which refer to *positions*, not
+   occurrences. Found because the benchmark reported a 52% zero-result rate.
+2. **The benchmark itself was wrong.** It reported a transport failure as a relevance
+   figure, which is the worst thing a benchmark can do: it produced plausible numbers
+   while the system under test was down. It now separates transport failures from
+   genuine zero-results and exits non-zero rather than reporting relevance during an
+   outage.
+
+### The scope gate
+
+Measured bm25 score distributions and found no threshold separates a relevant hit from
+an irrelevant one on a corpus this small — common English words score as well as real
+matches. The lexical stage therefore runs only when a query mentions a covered
+technology, resolved through 171 aliases. This is correct *because* the corpus is
+narrow, and becomes wrong as coverage grows; ADR-0008 records the trigger to revisit.
+
+---
+
+## Phase 4 — Playbook reader + diagnostic engine
+
+**State: VERIFIED STAGING.** Gate — *"the diagnostic flow works without JavaScript"* —
+is closed by test, against the deployed Worker.
+
+`tests/e2e/specs/no-javascript.spec.ts` disables JavaScript and walks a full diagnostic
+session: every control is a real link, the search form is a real GET form, and a
+playbook page renders all of its steps in the HTML. That last one is the
+crawlable-knowledge gate — knowledge that only exists after hydration is knowledge no
+crawler and no reader on a slow connection ever sees.
+
+Session state lives in the URL, so a session is shareable, bookmarkable and
+back-buttonable, and reaching a conclusion **records nothing by itself** — a reader
+states the outcome or no evidence exists. `diagnostic-flow.spec.ts` asserts that
+directly, along with backtracking truncating later steps (R-28) and the "I cannot tell"
+branch existing on test nodes (R-27).
+
+---
+
+## Phase 5 — Environment + evidence UX
+
+**State: VERIFIED STAGING.**
+
+The declared environment lives in a cookie, never in an account, and is used to filter
+search and to prefill the report form. Evidence is shown segmented by environment and
+never averaged: the compatibility matrix renders an untested combination as an
+invitation rather than a blank (R-30), and genuine conflicts between environments are
+stated in words rather than smoothed into "mostly works" (R-6).
+
+Every reproduction is bound to an **immutable environment snapshot**, not to the
+reader's current preset. Pointing evidence at a mutable preset would mean that
+upgrading Node silently rewrote the environment of every report that person had ever
+filed.
+
+---
+
+## Phase 6 — Authentication + contributor identity
+
+**State: VERIFIED STAGING for the unconfigured path.** The OAuth round-trip cannot be
+exercised until owner action **A0-4**; everything around it can be and has been.
+
+Decision record: [ADR-0009](docs/decisions/0009-authentication-strategy.md).
+
+### Verified against `https://dev-staging.itisyou.app`
+
+| Check | Result |
+|---|---|
+| `/sign-in` with no credentials configured | ✅ 200, says so plainly, renders no GitHub button |
+| Account corner absent from the nav when unconfigured | ✅ no sign-in link rendered anywhere |
+| `/auth/github/callback` with an unmatched state | ✅ 302 to `/sign-in?error=…`, state cookie cleared |
+| `GET /sign-out` | ✅ 302, revokes nothing — a prefetcher cannot sign anybody out |
+| `POST /sign-out` cross-origin | ✅ 403 |
+| `POST /sign-out` same-origin | ✅ 302, session revoked server-side |
+| Unknown or suspended profile | ✅ 404 |
+| Capability matrix, every role × every capability | ✅ 24/24, `packages/auth/src/capabilities.test.ts` |
+
+### One defect found and fixed: a cache-poisoning identity leak
+
+The nav renders the signed-in contributor's handle, and a playbook page is otherwise
+shared-cacheable at the edge. A signed-in reader's page would have been stored and
+served to the next anonymous reader, handle included.
+
+Closed at the Worker boundary: **any request carrying a session cookie is `no-store`**,
+whatever route it hit. `Vary: Cookie` was rejected — a second cookie (the environment
+preset already exists) would fragment the cache key and destroy the hit rate the public
+policy exists for. Verified both directions on staging:
+
+| Request | `cache-control` |
+|---|---|
+| `/p/:slug` anonymous | `public, max-age=60, s-maxage=300, stale-while-revalidate=86400` |
+| `/p/:slug` with `dv_session` | `no-store` |
+
+### What signing in does not buy
+
+`contributor` is the role a GitHub sign-in produces, and it holds **zero
+capabilities** — asserted exhaustively rather than spot-checked, so a capability added
+later cannot be granted to every account that signs in without the test failing.
+Account age, followers, stars and organisation membership are not read and not stored.
+
+---
+
+## Phase 8 — Reproduction + micro-contribution
+
+**State: VERIFIED STAGING.**
+
+Worked / Partial / Failed, prefilled from the diagnostic page, environment prefilled
+from the declared one, notes optional and last. R-31 budgets the whole flow at 10–30
+seconds, and forcing a written justification is a named abandonment trigger.
+
+Notes are scanned for hidden Unicode and credential-shaped strings **at submission**,
+which is the only moment the person who can fix it is still present. The receipt states
+exactly what was recorded and what it will and will not affect.
+
+One report per account per revision for signed-in contributors; one per address per
+revision for anonymous ones. The address guard is skipped for signed-in contributors —
+two colleagues behind one office address are two independent reproductions, and blocking
+the second would discard real evidence.
+
+---
+
+## Phase 9 — Revisioning, deprecation, staleness
+
+**State: IMPLEMENTED — not verified.** The routes exist (`/p/:slug/history`,
+`/p/:slug/r/:n`) and `/p/:slug/r/1` returns 200 on staging, but **every playbook in the
+staging corpus is at revision 1**, so nothing here has been exercised against a
+superseded revision, a deprecation banner, or evidence that stayed behind on an older
+version. `tests/e2e/specs/public-knowledge.spec.ts` marks where that test belongs.
+
+This is the largest untested area in the product, and it is the mechanism the whole
+evidence model rests on. It cannot move to `VERIFIED STAGING` until the corpus contains
+a real superseded revision.
+
+---
+
+## Phase 11 — Security hardening (in progress)
+
+**Delivered:** a hostile-content corpus of 61 entries across seven categories, and 82
+tests over the four `@devyou/security` modules — 81 passing, 1 pinned known-failure.
+UGC never becomes an HTML string: `markdown.ts` returns an AST and ESLint bans
+`dangerouslySetInnerHTML` repository-wide. CSP carries a per-response nonce.
+
+### Four defects found by the corpus and fixed
+
+1. **A false positive that would have trained readers to ignore the warning.**
+   `rm -rf ./node_modules` — the commonest use of those flags in this subject matter,
+   and fully recoverable — classified as `destructive`, identically to `rm -rf /`. The
+   classifier now inspects the target, not only the flags.
+2. **`chmod -R 777 /` under-rated** as `state_changing`, indistinguishable from scoping
+   the same mode to one file. The original mode bits are recorded nowhere, so it is not
+   undoable; now `destructive`.
+3. **`looksLikeSecret` missed credentials in connection URIs.** A pasted
+   `postgres://user:password@host/db` — one of the commonest accidental leaks there
+   is — passed every pattern, because they all required a literal keyword before the
+   value. Now matched on structure.
+4. **No open-redirect detection in `checkUrl`.** A link to a real, well-known host
+   carrying `?redirect_uri=https://evil.tld` came back `safe: true` with no flags —
+   exactly the shape a reader trusts without hovering, on a corpus where every link is
+   user-submitted.
+
+### One finding deliberately not "fixed"
+
+`history -c` remains `state_changing`. `SAFETY_LEVELS` measures blast radius, and
+clearing a shell history genuinely has a small one; what makes it notable is intent, and
+the vocabulary has no value for that. Inflating the level would make `destructive` mean
+two different things. Pinned as a visible known-failure in the test file with the
+reasoning attached, rather than silently dropped.
+
+---
+
+## Phase 12 — SEO, accessibility, performance (in progress)
+
+**Delivered:** a Playwright suite of 38 tests run across two viewports —
+**76/76 passing** against the deployed staging Worker — covering public knowledge, the
+diagnostic flow, no-JavaScript operation, axe accessibility, and eight committed visual
+baselines. Plus `robots.txt`, `sitemap.xml` and a generated `llms.txt`.
+
+### Three accessibility defects found and fixed
+
+1. **`/search` had no `<h1>`.** Every heading on the page was an `h2`, so the document
+   started at level 2 and a screen-reader user landing there had no statement of what
+   the page was. Now a visually-hidden `h1` naming the query.
+2. **Light-mode contrast failure on technology tags** — `#0f766e` on `#e4e4e7` measured
+   **4.31:1** against R-33's 4.5:1 requirement.
+3. **Light-mode contrast failure on the `state_changing` safety badge** — `#b45309` on
+   `#e4e4e7` measured **3.95:1**.
+
+Both colour failures existed only in light mode, which the product does not default
+to — which is exactly why the axe run is deliberately *not* forced into dark mode. The
+tokens are now `#115e59` and `#92400e`, measuring 5.1 and 4.8 against the darkest
+surface they sit on, with the ratios recorded in `theme.css` so the next person to
+adjust them knows what the numbers were chosen for.
+
+### Four dead links in the global nav and footer
+
+`/about`, `/how-verification-works`, `/contribute` and `/llms.txt` were linked from
+every page on the site and all four returned 404. A dead link in a persistent nav is a
+defect on every page at once. All four now exist and return 200.
+
+**Not yet done:** performance measurement. No Lighthouse or Core Web Vitals figures have
+been taken, so nothing in this phase claims a performance result.

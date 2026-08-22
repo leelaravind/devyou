@@ -144,8 +144,13 @@ These cannot be completed by Claude Code and are recorded rather than worked aro
 | A0-1 | Create a Cloudflare Access application for `dev-admin.itisyou.app` and `dev-admin-staging.itisyou.app`, and supply its AUD tag | Zero Trust configuration is account-level and outside `wrangler` | Deploying the Dev admin Worker to staging (Phase 10) |
 | A0-2 | Confirm DNS/custom domains for `dev.itisyou.app`, `dev-staging.itisyou.app`, `dev-admin.itisyou.app`, `dev-admin-staging.itisyou.app` | Custom-domain routes are created at deploy time but the zone is shared with live products | First staging deploy |
 | A0-3 | Decide the public content licence and contribution terms | Plan ADR-12 — required *before* opening unrestricted UGC, and it is a legal/commercial decision, not a technical one | Public launch (Phase 14), not earlier phases |
+| A0-4 | Register a GitHub OAuth app and set `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` as Worker Secrets per environment | Creating an OAuth app requires the GitHub account owner; the secret must never reach this repository | Sign-in only. Callback URLs: `https://dev-staging.itisyou.app/auth/github/callback` and `https://dev.itisyou.app/auth/github/callback` |
 
-None of these block Phases 1–9, which is why the build proceeds.
+None of these block Phases 1–9, which is why the build proceeds. **A0-4 does not block
+launch either**: with no credentials configured the sign-in page says so plainly and
+every other surface — read, search, diagnose, report — works unchanged. Reports filed in
+that state are shown and not counted toward confidence, which the report form states
+before submission. See [ADR-0009](../decisions/0009-authentication-strategy.md).
 
 ---
 

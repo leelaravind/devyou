@@ -20,7 +20,10 @@ import { cloudflareContext } from "../context/cloudflare";
  * changes before the split is built.
  */
 const MAX_URLS = 5000;
-const STATIC_PATHS = ["/", "/playbooks"];
+/* `/contribute` is deliberately absent: robots.txt disallows it and the route sets
+   `noindex`. A sitemap entry for a page you have told crawlers not to index is a
+   contradiction that search consoles report as an error. */
+const STATIC_PATHS = ["/", "/playbooks", "/how-verification-works", "/about"];
 
 export async function loader({ context }: Route.LoaderArgs) {
   const { env } = context.get(cloudflareContext);

@@ -63,16 +63,121 @@ function hasShortFlag(clause: string, letterClass: string): boolean {
   return new RegExp(`(^|\\s)-[A-Za-z]*${letterClass}[A-Za-z]*(\\s|$)`).test(clause);
 }
 
-function isRmForceRecursive(command: string): boolean {
-  return clauseAfter(command, /\brm\b/i).some((clause) => {
+/**
+ * Paths whose entire content is regenerable by a command in the same project.
+ *
+ * `rm -rf ./node_modules` is the single most common use of that flag combination
+ * in the world this product documents, and it is completely recoverable by
+ * `npm install`. Rating it identically to `rm -rf /` is not caution — it is the
+ * mechanism by which a warning stops being read. R-15 exists to make a genuine
+ * destructive command stand out, and a classifier that shouts at routine work
+ * destroys exactly that.
+ *
+ * Kept narrow on purpose. Every entry here is a directory that a build tool
+ * recreates from committed inputs. A directory that merely *looks* disposable —
+ * `tmp`, `data`, `logs` — is not on this list, because "the author probably did not
+ * mean anything important" is not a safety argument.
+ */
+const REGENERABLE_DIRECTORIES = [
+  "node_modules",
+  "dist",
+  "build",
+  "out",
+  "coverage",
+  "target",
+  "vendor",
+  "__pycache__",
+  ".next",
+  ".nuxt",
+  ".svelte-kit",
+  ".turbo",
+  ".cache",
+  ".parcel-cache",
+  ".pytest_cache",
+  ".venv",
+  "venv",
+  ".wrangler",
+];
+
+/** Roots where a recursive operation reaches beyond the project: `/`, `~`, `$HOME`,
+ *  a bare variable that could expand to anything, or a glob at the top level. */
+const DANGEROUS_ROOT_RE = /(^|\s)(\/|~|\$HOME\b|\$\{HOME\}|\/\*|~\/\*|\$\w+)(\s|$|\/\*\s*$)/;
+
+/**
+ * The operands of a command clause: everything that is not the command name and
+ * not a flag. Crude — it does not understand quoting or option arguments — and
+ * deliberately so, because it is used only to decide between two warning levels,
+ * never to permit anything.
+ */
+function operandsOf(clause: string): string[] {
+  return clause
+    .trim()
+    .split(/\s+/)
+    .slice(1)
+    .filter((token) => !token.startsWith("-"));
+}
+
+/** Whether every operand names a regenerable project-local directory, with no
+ *  absolute path, no home reference, no variable and no glob among them. */
+function targetsOnlyRegenerablePaths(clause: string): boolean {
+  const operands = operandsOf(clause);
+  if (operands.length === 0) return false;
+  if (DANGEROUS_ROOT_RE.test(clause)) return false;
+
+  return operands.every((operand) => {
+    if (operand.startsWith("/") || operand.startsWith("~") || operand.includes("$")) return false;
+    if (operand.includes("*") || operand.includes("?")) return false;
+
+    const segments = operand.replace(/\/+$/, "").split("/");
+    const last = segments[segments.length - 1];
+    return last !== undefined && REGENERABLE_DIRECTORIES.includes(last);
+  });
+}
+
+function rmForceRecursiveClauses(command: string): string[] {
+  return clauseAfter(command, /\brm\b/i).filter((clause) => {
     const recursive = hasShortFlag(clause, "[rR]") || /--recursive\b/.test(clause);
     const force = hasShortFlag(clause, "f") || /--force\b/.test(clause);
     return recursive && force;
   });
 }
 
+/** `rm -rf` aimed at something that is not merely a rebuildable artefact. */
+function isRmForceRecursive(command: string): boolean {
+  return rmForceRecursiveClauses(command).some((clause) => !targetsOnlyRegenerablePaths(clause));
+}
+
+/** `rm -rf` aimed only at rebuildable artefacts — still a real deletion, still
+ *  worth a note, but not the same warning as an unrecoverable one. */
+function isRmForceRecursiveRegenerable(command: string): boolean {
+  const clauses = rmForceRecursiveClauses(command);
+  return clauses.length > 0 && clauses.every(targetsOnlyRegenerablePaths);
+}
+
 function isChmodWideOpen(command: string): boolean {
   return /\bchmod\b[^;\n]*\b0?777\b/i.test(command);
+}
+
+/**
+ * `chmod -R 777 /` and its neighbours.
+ *
+ * Recursively making a filesystem root — or a home directory, or `/etc`, `/usr`,
+ * `/var` — world-writable is not "changes state". It is a system-wide compromise
+ * that no `chmod` undoes, because the original mode bits are gone. Separated from
+ * the scoped case so the two do not share a warning level.
+ */
+function isChmodWideOpenRecursiveSystemWide(command: string): boolean {
+  return clauseAfter(command, /\bchmod\b/i).some((clause) => {
+    if (!/\b0?777\b/.test(clause)) return false;
+    const recursive = hasShortFlag(clause, "R") || /--recursive\b/.test(clause);
+    if (!recursive) return false;
+
+    return operandsOf(clause).some((operand) =>
+      /^(\/|~|\$HOME\b|\$\{HOME\})(\/?$|\/(etc|usr|var|bin|sbin|lib|opt|boot|root|home)\b)/.test(
+        operand,
+      ),
+    );
+  });
 }
 
 function isChownRecursive(command: string): boolean {
@@ -135,6 +240,24 @@ const SECRET_PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
     name: "credential-shaped assignment",
     re: /\b(api[_-]?key|secret|token|password)\s*[:=]\s*["']?[A-Za-z0-9\-_]{16,}["']?/i,
   },
+  {
+    /*
+      A password embedded in a connection URI — `postgres://user:pass@host/db`.
+
+      This is the shape a pasted `DATABASE_URL` takes, and it is one of the most
+      common accidental leaks there is: nobody thinks of a connection string as a
+      credential, because the credential is not labelled. Every pattern above
+      requires a literal keyword before the value, so this shape slipped through all
+      of them.
+
+      Matched on structure rather than on a keyword: a scheme, a userinfo section
+      containing a colon, and an `@`. The password is required to be at least four
+      characters so that `http://localhost:8787/path` and other colon-bearing URLs
+      with no userinfo do not match.
+    */
+    name: "credential in a connection URI",
+    re: /\b[a-z][a-z0-9+.-]*:\/\/[^\s:/?#@]+:[^\s/?#@]{4,}@[^\s/?#]+/i,
+  },
 ];
 
 function matchesAnySecretPattern(text: string): boolean {
@@ -165,6 +288,22 @@ const RULES: Rule[] = [
     level: "destructive",
     explanation: "Writing directly to /dev/sd*, /dev/hd*, /dev/nvme* or /dev/xvd* can destroy a disk's contents.",
     test: (command) => />\s*\/dev\/(sd|hd|nvme|xvd)\w*/i.test(command),
+  },
+  {
+    pattern: "rm -rf of a rebuildable directory",
+    level: "state_changing",
+    explanation:
+      "Deletes a directory that a build tool regenerates (node_modules, dist, a cache). Still a real " +
+      "deletion — anything you edited in there is gone — but recoverable by reinstalling or rebuilding.",
+    test: isRmForceRecursiveRegenerable,
+  },
+  {
+    pattern: "chmod -R 777 on a system path",
+    level: "destructive",
+    explanation:
+      "Recursively makes a filesystem root or system directory world-writable. The original permissions " +
+      "are not recorded anywhere, so this cannot be undone, and any local user can then modify anything.",
+    test: isChmodWideOpenRecursiveSystemWide,
   },
   {
     pattern: "chmod 777",

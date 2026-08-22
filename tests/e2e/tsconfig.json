@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // DOM is needed here and nowhere else in the workspace. The bodies passed to
+    // `page.evaluate` are serialised and run inside the browser, so they legitimately
+    // reference `document` and `getComputedStyle` — the test file is the one place
+    // where Node code and browser code share a source file.
+    "lib": ["ES2023", "DOM"],
+    "types": ["node", "@playwright/test"],
+    "noEmit": true
+  },
+  "include": ["playwright.config.ts", "specs/**/*.ts"]
+}

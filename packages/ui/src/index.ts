@@ -16,6 +16,7 @@ export { Spinner } from "./spinner.js";
 export { CodeBlock, type CodeBlockProps } from "./code-block.js";
 export {
   ConfidenceBadge,
+  ConfidenceBandChip,
   EvidenceRate,
   EvidenceChip,
   OutcomeChip,

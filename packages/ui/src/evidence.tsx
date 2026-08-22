@@ -39,6 +39,40 @@ const BAND_STYLE: Record<ConfidenceBand, { className: string; icon: IconName }> 
   deprecated: { className: "text-destructive-red border-destructive-red/50", icon: "block" },
 };
 
+/**
+ * The band's chip on its own, with no counts and no explain link.
+ *
+ * Exists for exactly one caller: the page that explains what the bands mean. There,
+ * a band is the subject of a sentence rather than a claim about a playbook, so there
+ * are no counts — and `ConfidenceBadge` is right to refuse to render without them.
+ * The alternative, passing zeroes to satisfy the type, would put "no reproductions
+ * yet" beside a definition of "Strong evidence", which is worse than either.
+ *
+ * Do not reach for this to render a band on a playbook. If you have a band you have
+ * counts, and a reader looking at a real playbook needs both.
+ */
+export function ConfidenceBandChip({
+  band,
+  className,
+}: {
+  band: ConfidenceBand;
+  className?: string;
+}) {
+  const style = BAND_STYLE[band];
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded border bg-surface-variant px-2 py-1 font-mono text-label-caps uppercase",
+        style.className,
+        className,
+      )}
+    >
+      <Icon name={style.icon} size={14} />
+      {CONFIDENCE_BAND_LABELS[band]}
+    </span>
+  );
+}
+
 export interface EvidenceCounts {
   /** Independent successful reproductions. */
   reproducedPassed: number;

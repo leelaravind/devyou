@@ -139,13 +139,21 @@
   --dv-error-container: #fee2e2;
   --dv-on-error-container: #7f1d1d;
 
+  /* The light-mode semantic colours are darker than their Tailwind-palette
+     equivalents on purpose. These are rendered as small text on the chip and badge
+     backgrounds — #e4e4e7 and #d4d4d8 — where the obvious choices fail R-33's 4.5:1:
+     teal-700 (#0f766e) measures 4.31 and amber-700 (#b45309) 3.96. The values here
+     measure 5.1 and 4.8 against the darkest of those backgrounds, so the margin
+     survives a future surface tweak. Verified by axe in tests/e2e/specs/accessibility.spec.ts,
+     which runs in light mode precisely because the product's default is dark and this
+     is where the failures hide. */
   --dv-evidence-blue: #1d4ed8;
-  --dv-technical-teal: #0f766e;
+  --dv-technical-teal: #115e59;
   --dv-status-documented: #52525b;
   --dv-status-confirmed: #4338ca;
   --dv-status-reproduced: #be185d;
   --dv-status-ci-verified: #047857;
-  --dv-warning-amber: #b45309;
+  --dv-warning-amber: #92400e;
   --dv-destructive-red: #b91c1c;
   --dv-diagnostic-node-bg: #f4f4f5;
 
@@ -193,12 +201,12 @@
     --dv-error-container: #fee2e2;
     --dv-on-error-container: #7f1d1d;
     --dv-evidence-blue: #1d4ed8;
-    --dv-technical-teal: #0f766e;
+    --dv-technical-teal: #115e59;
     --dv-status-documented: #52525b;
     --dv-status-confirmed: #4338ca;
     --dv-status-reproduced: #be185d;
     --dv-status-ci-verified: #047857;
-    --dv-warning-amber: #b45309;
+    --dv-warning-amber: #92400e;
     --dv-destructive-red: #b91c1c;
     --dv-diagnostic-node-bg: #f4f4f5;
     color-scheme: light;

@@ -72,6 +72,21 @@ export default function Search({ loaderData }: Route.ComponentProps) {
 
   return (
     <main id="main" className="mx-auto flex w-full max-w-[1280px] flex-col gap-margin px-margin py-8">
+      {/*
+        Visually hidden, and required.
+
+        Every heading on this page is an `h2` describing one group of results, so
+        without this the document starts at level 2 and a screen-reader user landing
+        here has no statement of what the page is. Rendering it visibly would cost a
+        line of vertical space above the search box on a page whose whole job is to
+        put the box and the results in front of somebody in a hurry — so it is
+        announced rather than drawn, and it names the query, which is the one thing
+        that distinguishes this page from the last one.
+      */}
+      <h1 className="sr-only">
+        {query ? `Search results for ${query}` : "Search DEV.ITISYOU"}
+      </h1>
+
       <Form method="get" role="search" className="flex flex-col gap-2">
         <label htmlFor="q" className="sr-only">
           Search

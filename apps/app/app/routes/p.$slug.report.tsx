@@ -3,6 +3,7 @@ import { Button, Card, Field, Icon, Input, OutcomeChip, Textarea } from "@devyou
 import { REPRODUCTION_OUTCOMES, type ReproductionOutcome } from "@devyou/core";
 import { normaliseVersion, type EnvironmentSnapshot } from "@devyou/domain";
 import { scanUnicode, revealHidden, looksLikeSecret } from "@devyou/security";
+import { resolvePrincipal } from "@devyou/auth";
 import type { Route } from "./+types/p.$slug.report";
 import { cloudflareContext } from "../context/cloudflare";
 import { loadRevisionBySlug } from "../lib/playbook.server";
@@ -51,6 +52,15 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     reachedNodeId: url.searchParams.get("node"),
     stepsParam: url.searchParams.get("steps"),
     environment: readEnvironmentCookie(request),
+    /*
+      Whether this report will be counted, stated on the form before it is filed.
+
+      An anonymous report is stored, shown and never counted toward the confidence
+      band (R-9). Telling somebody that afterwards, or not at all, is how a product
+      earns the reputation of quietly discarding contributions — so the form says it
+      up front, and still lets them file it either way.
+    */
+    signedIn: (await resolvePrincipal(env.DB, request)) !== null,
   };
 }
 
@@ -107,6 +117,35 @@ export async function action({ params, request, context }: Route.ActionArgs) {
     );
   }
 
+  const principal = await resolvePrincipal(env.DB, request);
+
+  /*
+    One report per account per revision, checked before the address guard below.
+
+    A signed-in contributor is identified, so the identity is the right key — and it
+    is the only one that survives a changed network. The database enforces this too
+    (unique index on actor + revision); the check here exists to return a sentence
+    rather than a constraint violation.
+  */
+  if (principal) {
+    const existing = await env.DB.prepare(
+      `SELECT id FROM reproduction_reports WHERE revision_id = ?1 AND actor_id = ?2 LIMIT 1`,
+    )
+      .bind(revision.revisionId, principal.userId)
+      .first<{ id: string }>();
+
+    if (existing) {
+      return data(
+        {
+          error:
+            "You have already reported this revision. Reports cannot be edited — if the result " +
+            "changed, that is a new revision's evidence, not a correction to this one.",
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   const ip = request.headers.get("cf-connecting-ip");
   const ipHash = await hashIp(ip, revision.revisionId);
 
@@ -117,8 +156,13 @@ export async function action({ params, request, context }: Route.ActionArgs) {
     refresh, a shared office address. Real Sybil resistance is the weighting in
     `recomputeConfidence`, which gives an anonymous report zero weight toward the
     band — this only stops the evidence list filling with duplicates.
+
+    Skipped for a signed-in contributor: two colleagues behind one office address
+    are two independent reproductions, and blocking the second would silently
+    discard real evidence. The account check above already covers the double-submit
+    case for them.
   */
-  if (ipHash) {
+  if (ipHash && !principal) {
     const existing = await env.DB.prepare(
       `SELECT id FROM reproduction_reports WHERE revision_id = ?1 AND ip_hash = ?2 LIMIT 1`,
     )
@@ -141,7 +185,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 
   await recordReproduction(env.DB, {
     revisionId: revision.revisionId,
-    actorId: null,
+    actorId: principal?.userId ?? null,
     outcome,
     reachedNodeId: validNode,
     notes: notesRaw.trim() === "" ? null : notesRaw.trim(),
@@ -154,7 +198,7 @@ export async function action({ params, request, context }: Route.ActionArgs) {
 }
 
 export default function Report({ loaderData, actionData }: Route.ComponentProps) {
-  const { revision, outcome, reachedNodeId, environment } = loaderData;
+  const { revision, outcome, reachedNodeId, environment, signedIn } = loaderData;
   const navigation = useNavigation();
 
   /*
@@ -312,14 +356,20 @@ export default function Report({ loaderData, actionData }: Route.ComponentProps)
           <Button type="submit" loading={submitting} iconLeft="check">
             Submit the report
           </Button>
-          <p className="text-body-sm text-on-surface-variant">
-            You are not signed in, so this will be shown but will not count toward the confidence
-            figure.{" "}
-            <Link to="/sign-in" className="text-evidence-blue underline">
-              Sign in
-            </Link>{" "}
-            if you want it to.
-          </p>
+          {signedIn ? (
+            <p className="text-body-sm text-on-surface-variant">
+              This will be counted toward the confidence figure and attributed to you.
+            </p>
+          ) : (
+            <p className="text-body-sm text-on-surface-variant">
+              You are not signed in, so this will be shown but will not count toward the confidence
+              figure.{" "}
+              <Link to="/sign-in" className="text-evidence-blue underline">
+                Sign in
+              </Link>{" "}
+              if you want it to.
+            </p>
+          )}
         </div>
       </Form>
     </main>

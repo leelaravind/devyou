@@ -5,6 +5,7 @@ import {
   newCspNonce,
   withSecurityHeaders,
 } from "@devyou/core";
+import { SESSION_COOKIE } from "@devyou/auth";
 import { cloudflareContext } from "../app/context/cloudflare";
 import { nonceContext } from "../app/context/nonce";
 
@@ -34,7 +35,7 @@ export default {
 
     return withSecurityHeaders(response, {
       nonce,
-      cache: cachePolicyFor(url.pathname, response),
+      cache: cachePolicyFor(url.pathname, response, request),
     });
   },
 } satisfies ExportedHandler<Env>;
@@ -50,11 +51,30 @@ export default {
  * The default is the safe one. A new route is uncached until somebody deliberately
  * adds it here, which is the correct direction for this mistake to fail in.
  */
-function cachePolicyFor(pathname: string, response: Response): string {
+function cachePolicyFor(pathname: string, response: Response, request: Request): string {
   if (isImmutableAsset(pathname)) return CACHE.immutable;
 
   // Never cache an error. A cached 500 outlives the incident that caused it.
   if (!response.ok) return CACHE.private;
+
+  /*
+    A request carrying a session cookie is never shared-cached, whatever route it
+    hit.
+
+    The nav on a public playbook page renders the signed-in contributor's handle.
+    That page is otherwise `publicKnowledge` and would sit happily in an edge cache
+    — and then be served, handle and all, to the next anonymous reader. `Vary:
+    Cookie` would technically express this, but it is fragile: any future cookie
+    (the environment preset cookie already exists) would fragment the cache key and
+    quietly destroy the hit rate that the public policy exists for.
+
+    Keying on "did this request authenticate" instead keeps the cacheable case fully
+    cacheable for the anonymous majority, including every crawler, and takes the
+    personalised case out of shared caches entirely. It also fails in the right
+    direction: forgetting to exclude a new personalised route costs a cache miss,
+    not a leak.
+  */
+  if (hasSessionCookie(request)) return CACHE.private;
 
   if (pathname === "/robots.txt" || pathname.endsWith("/sitemap.xml") || pathname === "/llms.txt") {
     return CACHE.metadata;
@@ -75,4 +95,13 @@ function cachePolicyFor(pathname: string, response: Response): string {
   const isSessionState = pathname.includes("/diagnose");
 
   return isPublicKnowledge && !isSessionState ? CACHE.publicKnowledge : CACHE.private;
+}
+
+/** Whether the request presented a session cookie. Presence only — validity is the
+ *  loader's business; an expired cookie should still keep the response out of a
+ *  shared cache, because the page may have rendered a signed-out state for a reader
+ *  who is about to sign in. */
+function hasSessionCookie(request: Request): boolean {
+  const header = request.headers.get("cookie");
+  return header !== null && header.includes(`${SESSION_COOKIE}=`);
 }

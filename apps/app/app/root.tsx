@@ -11,7 +11,9 @@ import type { LinksFunction } from "react-router";
 import { SkipLink, TopNav, CompactSearch, Icon } from "@devyou/ui";
 
 import type { Route } from "./+types/root";
+import { cloudflareContext } from "./context/cloudflare";
 import { nonceContext } from "./context/nonce";
+import { loadAuthState } from "./lib/auth.server";
 import "./app.css";
 
 export const links: LinksFunction = () => [
@@ -23,8 +25,35 @@ export const links: LinksFunction = () => [
   },
 ];
 
-export function loader({ context }: Route.LoaderArgs) {
-  return { nonce: context.get(nonceContext) };
+/**
+ * The root loader resolves the principal for every route.
+ *
+ * It costs one indexed lookup, and only for a request that actually presented a
+ * session cookie — `resolvePrincipal` returns immediately when there is none, which
+ * is the anonymous read path the whole product is tuned for. The alternative, each
+ * route resolving its own, produces the class of bug where a page renders as signed
+ * out because somebody forgot.
+ *
+ * A request that authenticates is taken out of the shared cache at the Worker
+ * boundary; see `cachePolicyFor`.
+ */
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const { env } = context.get(cloudflareContext);
+  const auth = await loadAuthState(request, env);
+
+  return {
+    nonce: context.get(nonceContext),
+    /* Only what the nav renders. The role and user id stay server-side: neither is
+       needed to draw a link, and a role in the HTML invites client-side gating,
+       which is not a control. */
+    viewer: auth.principal
+      ? {
+          handle: auth.principal.handle,
+          displayName: auth.principal.displayName ?? auth.principal.handle,
+        }
+      : null,
+    signInAvailable: auth.signInAvailable,
+  };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -63,7 +92,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function App() {
+export default function App({ loaderData }: Route.ComponentProps) {
+  const { viewer, signInAvailable } = loaderData;
+
   return (
     <>
       <TopNav
@@ -73,18 +104,72 @@ export default function App() {
         ]}
         search={<CompactSearch />}
         actions={
-          <a
-            href="/environment"
-            className="rounded p-2 text-on-surface-variant transition-colors hover:bg-surface-container-highest"
-            title="Your environment"
-          >
-            <Icon name="hub" label="Your environment" />
-          </a>
+          <>
+            <a
+              href="/environment"
+              className="rounded p-2 text-on-surface-variant transition-colors hover:bg-surface-container-highest"
+              title="Your environment"
+            >
+              <Icon name="hub" label="Your environment" />
+            </a>
+            <AccountSlot viewer={viewer} signInAvailable={signInAvailable} />
+          </>
         }
       />
       <Outlet />
       <SiteFooter />
     </>
+  );
+}
+
+/**
+ * The account corner.
+ *
+ * Absent entirely when sign-in is unconfigured — an affordance that leads to "not
+ * available" is worse than no affordance. Signing out is a form, not a link:
+ * `GET /sign-out` would let any image tag on any page sign a reader out, and a
+ * prefetching browser would do it unprompted.
+ */
+function AccountSlot({
+  viewer,
+  signInAvailable,
+}: {
+  viewer: { handle: string | null; displayName: string | null } | null;
+  signInAvailable: boolean;
+}) {
+  if (viewer) {
+    return (
+      <div className="flex items-center gap-1">
+        {viewer.handle && (
+          <a
+            href={`/profile/${viewer.handle}`}
+            className="hidden rounded px-2 py-2 font-mono text-label-caps uppercase text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-on-surface sm:block"
+          >
+            {viewer.displayName ?? viewer.handle}
+          </a>
+        )}
+        <form method="post" action="/sign-out">
+          <button
+            type="submit"
+            className="rounded p-2 text-on-surface-variant transition-colors hover:bg-surface-container-highest"
+            title="Sign out"
+          >
+            <Icon name="logout" label="Sign out" />
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  if (!signInAvailable) return null;
+
+  return (
+    <a
+      href="/sign-in"
+      className="rounded px-3 py-2 font-mono text-label-caps uppercase text-on-surface-variant transition-colors hover:bg-surface-container-highest hover:text-on-surface"
+    >
+      Sign in
+    </a>
   );
 }
 

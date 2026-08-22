@@ -40,7 +40,31 @@ export default [
   route("playbooks", "routes/playbooks.tsx"),
   route("environment", "routes/environment.tsx"),
 
+  /*
+    Authentication.
+
+    Public reading needs none of this — every knowledge route resolves a principal
+    and carries on without one. These exist so a contribution or a reproduction can
+    be attributed, which is the only thing signing in changes.
+  */
+  route("sign-in", "routes/sign-in.tsx"),
+  route("sign-out", "routes/sign-out.ts"),
+  route("auth/github/callback", "routes/auth.github.callback.ts"),
+  route("profile/:handle", "routes/profile.$handle.tsx"),
+
+  /*
+    Explainer and entry-point pages.
+
+    Every one of these is linked from the global nav or footer, which is the reason
+    they exist as routes rather than as a to-do: a dead link in a persistent nav is a
+    defect on every page of the site at once.
+  */
+  route("about", "routes/about.tsx"),
+  route("how-verification-works", "routes/how-verification-works.tsx"),
+  route("contribute", "routes/contribute.tsx"),
+
   route("robots.txt", "routes/robots.ts"),
+  route("llms.txt", "routes/llms.ts"),
   route("sitemap.xml", "routes/sitemap.ts"),
   route("healthz", "routes/healthz.ts"),
 ] satisfies RouteConfig;

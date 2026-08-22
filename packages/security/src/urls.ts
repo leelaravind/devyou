@@ -47,7 +47,79 @@ const FLAG_REASONS: Record<string, string> = {
     "The host is an internationalised (punycode) domain, which can be crafted to look like a " +
     "different, trusted domain.",
   trailing_dot: "The host has a trailing dot, which some tooling treats differently from the same name without one.",
+  offsite_redirect_parameter:
+    "The link carries another site's address in a redirect parameter, so following it can land " +
+    "somewhere other than the host shown.",
 };
+
+/**
+ * Query parameters whose value is treated as a destination.
+ *
+ * The list is the conventional set, and being a list is the limitation: an
+ * application can name its redirect parameter anything. This catches the common
+ * shapes, which is the honest claim — it is not a proof that a link stays on the
+ * host it displays.
+ */
+const REDIRECT_PARAMETERS = [
+  "redirect",
+  "redirect_uri",
+  "redirect_url",
+  "redirecturl",
+  "return",
+  "return_to",
+  "returnto",
+  "return_url",
+  "returnurl",
+  "next",
+  "continue",
+  "url",
+  "u",
+  "dest",
+  "destination",
+  "goto",
+  "target",
+  "callback",
+  "callback_url",
+  "forward",
+  "rurl",
+];
+
+/**
+ * Whether a link carries an off-host destination in its query string.
+ *
+ * This is the open-redirect shape, and it matters here more than it would on most
+ * sites: every link in this corpus is user-submitted, and a link whose visible host
+ * is a well-known documentation domain is precisely what a reader will trust
+ * without hovering. `https://docs.example.com/logout?redirect_uri=https://evil.tld`
+ * passes every other check in this module — correct scheme, real host, no userinfo,
+ * no punycode — while sending the reader somewhere else entirely.
+ *
+ * Only an *absolute* destination on a *different* host is flagged. A relative
+ * `?next=/dashboard` cannot leave the site, and a same-host absolute one is where
+ * the reader already thought they were going.
+ *
+ * The check does not attempt to decide whether the target application actually
+ * honours the parameter — that is not knowable from here. It reports that the link
+ * makes a claim the visible host does not support, which is what a reader needs.
+ */
+function hasOffsiteRedirectParameter(url: URL): boolean {
+  for (const [name, value] of url.searchParams) {
+    if (!REDIRECT_PARAMETERS.includes(name.toLowerCase())) continue;
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value.trim()) && !value.trim().startsWith("//")) continue;
+
+    try {
+      // A protocol-relative value ("//evil.tld/x") resolves against this URL, which
+      // is exactly how a browser would read it.
+      const destination = new URL(value.trim(), url);
+      if (destination.hostname.toLowerCase() !== url.hostname.toLowerCase()) return true;
+    } catch {
+      // An unparsable destination is not evidence of a redirect; the other checks
+      // in this module already cover a malformed link.
+      continue;
+    }
+  }
+  return false;
+}
 
 function describeFlags(flags: readonly string[]): string {
   return flags.map((flag) => FLAG_REASONS[flag] ?? flag).join(" ");
@@ -105,6 +177,7 @@ export function checkUrl(raw: string): UrlVerdict {
   if (isPrivateOrLocalHost(hostname)) flags.push("private_host");
   if (hasPunycodeLabel(hostname)) flags.push("idn_homograph");
   if (hostname.endsWith(".")) flags.push("trailing_dot");
+  if (hasOffsiteRedirectParameter(url)) flags.push("offsite_redirect_parameter");
 
   if (flags.length > 0) {
     return { safe: false, normalised: null, flags, reason: describeFlags(flags) };
