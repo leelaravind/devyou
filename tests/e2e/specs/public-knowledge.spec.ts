@@ -132,14 +132,11 @@ test.describe("crawl surface (plan §16)", () => {
 });
 
 test.describe("historical revisions survive (plan §9)", () => {
-  // Every seeded playbook in the staging corpus is currently at its first revision
-  // (verified against /p/:slug/history for several slugs including this one), so
-  // there is no *superseded* revision yet to exercise the lifecycle banner against.
-  // What this asserts instead is the part of plan §9 that does not depend on the
-  // corpus having aged: a revision URL, `/p/:slug/r/:n`, keeps resolving at 200.
-  // TODO: once a playbook has been revised, add a companion test that follows
-  // `/p/:slug/history` to a *superseded* row and asserts its banner text and that
-  // its evidence count is scoped to that revision alone (R-1).
+  // The superseded-revision surface — banners, evidence scoping, history, and the
+  // fact that revision 1 keeps serving revision 1's text — is covered in
+  // `revision-lifecycle.spec.ts` against the one playbook that has actually been
+  // revised. This asserts the part that must hold for *every* playbook, revised or
+  // not: a revision URL never stops resolving.
   test("/p/:slug/r/1 returns 200", async ({ request }) => {
     const response = await request.get(`/p/${D1_SLUG}/r/1`);
     expect(response.status()).toBe(200);

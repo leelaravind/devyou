@@ -122,6 +122,14 @@ export default function HowVerificationWorks() {
             </BandRow>
           </li>
           <li>
+            <BandRow band="superseded">
+              A newer revision has replaced this text. It is not a judgement about whether the
+              procedure worked — the evidence below it is still true about the wording it was
+              recorded against, which is why superseded revisions stay readable at their own URLs
+              rather than redirecting.
+            </BandRow>
+          </li>
+          <li>
             <BandRow band="needs_reverification">
               At least {THRESHOLDS.FAILURE_RATIO_MIN_SAMPLE} reports, of which at least a third
               failed. Recent failures pull a revision back regardless of how many successes it has

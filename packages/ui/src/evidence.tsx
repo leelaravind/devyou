@@ -36,6 +36,10 @@ const BAND_STYLE: Record<ConfidenceBand, { className: string; icon: IconName }> 
   moderate_evidence: { className: "text-status-reproduced border-status-reproduced/40", icon: "fingerprint" },
   strong_evidence: { className: "text-status-ci-verified border-status-ci-verified/50", icon: "shield" },
   needs_reverification: { className: "text-warning-amber border-warning-amber/50", icon: "schedule" },
+  // Neutral, not alarming. A superseded revision is history, not a hazard — colouring
+  // it like the deprecated state below would reintroduce by styling the exact
+  // confusion the separate band exists to remove.
+  superseded: { className: "text-status-documented border-status-documented/40", icon: "history" },
   deprecated: { className: "text-destructive-red border-destructive-red/50", icon: "block" },
 };
 

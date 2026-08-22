@@ -96,10 +96,33 @@ describe("deriveConfidenceBand", () => {
   it("lets lifecycle state override evidence entirely", () => {
     const strong = tally({ reproducedPassed: 50, uniqueEnvironments: 10 });
     expect(deriveConfidenceBand(strong, { ...NO_LIFECYCLE, deprecatedAt: 1 })).toBe("deprecated");
-    expect(deriveConfidenceBand(strong, { ...NO_LIFECYCLE, supersededAt: 1 })).toBe("deprecated");
+    expect(deriveConfidenceBand(strong, { ...NO_LIFECYCLE, supersededAt: 1 })).toBe("superseded");
     expect(deriveConfidenceBand(strong, { ...NO_LIFECYCLE, needsReverificationAt: 1 })).toBe(
       "needs_reverification",
     );
+  });
+
+  /*
+    Superseded and deprecated say opposite things, and this used to return
+    "deprecated" for both — which told every reader on a historical revision that its
+    procedure was known-bad, when it had only been reworded. Found by publishing a
+    real second revision on staging and reading the page.
+  */
+  it("does not tell a reader that a superseded revision is deprecated", () => {
+    const strong = tally({ reproducedPassed: 50, uniqueEnvironments: 10 });
+    expect(deriveConfidenceBand(strong, { ...NO_LIFECYCLE, supersededAt: 1 })).not.toBe(
+      "deprecated",
+    );
+  });
+
+  it("prefers deprecated when a revision is both superseded and deprecated", () => {
+    // Deprecation is the stronger claim — "this no longer works" outranks "there is
+    // newer wording" — so a revision carrying both must not be softened to the
+    // milder one.
+    const strong = tally({ reproducedPassed: 50, uniqueEnvironments: 10 });
+    expect(
+      deriveConfidenceBand(strong, { ...NO_LIFECYCLE, supersededAt: 1, deprecatedAt: 2 }),
+    ).toBe("deprecated");
   });
 });
 

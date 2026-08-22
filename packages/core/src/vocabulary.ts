@@ -83,6 +83,17 @@ export const CONFIDENCE_BANDS = [
   "moderate_evidence",
   "strong_evidence",
   "needs_reverification",
+  /*
+    Superseded is its own band, and keeping it distinct from `deprecated` matters
+    more than the extra value costs.
+
+    They say opposite things. Deprecated means "this no longer works". Superseded
+    means "there is a newer wording of something that does" — the text was replaced,
+    not disproved, and its evidence is still true about the text it was recorded
+    against. Collapsing the two labelled every historical revision as broken, which
+    is the one claim a reader on a historical revision must not be told falsely.
+  */
+  "superseded",
   "deprecated",
 ] as const;
 export type ConfidenceBand = (typeof CONFIDENCE_BANDS)[number];
@@ -96,6 +107,7 @@ export const CONFIDENCE_BAND_LABELS: Record<ConfidenceBand, string> = {
   moderate_evidence: "Moderate evidence",
   strong_evidence: "Strong evidence",
   needs_reverification: "Needs reverification",
+  superseded: "Superseded",
   deprecated: "Deprecated",
 };
 

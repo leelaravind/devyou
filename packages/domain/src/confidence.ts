@@ -104,7 +104,14 @@ export function deriveConfidenceBand(
   lifecycle: LifecycleState = { deprecatedAt: null, supersededAt: null, needsReverificationAt: null },
 ): ConfidenceBand {
   if (lifecycle.deprecatedAt !== null) return "deprecated";
-  if (lifecycle.supersededAt !== null) return "deprecated";
+  /*
+    Superseded is not deprecated, and returning "deprecated" here told readers on
+    every historical revision that its procedure was known-bad. It was not — it was
+    replaced. The evidence on a superseded revision remains exactly as strong as it
+    was about the text it was recorded against, which is the whole reason historical
+    revisions stay readable.
+  */
+  if (lifecycle.supersededAt !== null) return "superseded";
   if (lifecycle.needsReverificationAt !== null) return "needs_reverification";
 
   const totalReports = tally.reproducedPassed + tally.reproducedPartial + tally.reproducedFailed;

@@ -1,0 +1,216 @@
+{
+  "slug": "d1-migration-not-applied-no-such-table",
+  "problemTitle": "D1 says a table doesn't exist even though a migration created it",
+  "problemSummary": "A query against D1 fails with \"no such table\" even though a migration that creates the table has been written and appears to have run, because it was applied to the wrong target (local vs remote) or against the wrong database.",
+  "title": "Fixing D1 \"no such table\" after a migration that seemed to run",
+  "summary": "Covers the two most common causes: applying a migration to the wrong local/remote target, and a Worker binding pointing at a different database_id than the one that was migrated. Does not cover a migration file that itself has a SQL error (that fails loudly at apply time, not later as \"no such table\"), or drift specifically caused by an ORM's own migration tracking — see the Drizzle-specific playbook for that. Also covers a preview_database_id on the binding sending wrangler dev to a different database from the one the migration was applied to.",
+  "symptoms": [
+    "A query fails with D1_ERROR: no such table: <table>, or SQLITE_ERROR: no such table",
+    "You're confident the migration file that creates the table exists and looks correct",
+    "The table shows up when queried against one environment (e.g. local) but not another (e.g. remote), or vice versa"
+  ],
+  "signatures": [
+    {
+      "errorCode": "SQLITE_ERROR",
+      "normalisedMessage": "d1_error: no such table",
+      "languageHint": "typescript",
+      "runtimeHint": "workers"
+    }
+  ],
+  "technologies": [
+    "cloudflare-d1",
+    "wrangler"
+  ],
+  "nodes": [
+    {
+      "id": "n1",
+      "type": "start",
+      "title": "D1 query fails with \"no such table\"",
+      "body": "A SELECT/INSERT/UPDATE against a table fails as if it were never created, despite a migration existing for it."
+    },
+    {
+      "id": "n2",
+      "type": "test",
+      "title": "Check which database the migration actually ran against",
+      "body": "D1 local and remote are separate SQLite databases. `wrangler d1 migrations apply` needs an explicit `--local` or `--remote` flag, and running it once with one flag does not apply it to the other.",
+      "command": "npx wrangler d1 migrations list <DATABASE_NAME> --remote",
+      "commandLanguage": "sh",
+      "expectedOutput": "The migration you expect is listed under migrations still to be applied, rather than under already-applied ones.",
+      "safetyLevel": "informational",
+      "safetyEffect": null
+    },
+    {
+      "id": "n3",
+      "type": "fix",
+      "title": "Apply the migration to the target that's missing it",
+      "body": "Run migrations apply against whichever target the failing query is actually hitting — typically `--remote` for a deployed Worker, `--local` for `wrangler dev`.",
+      "command": "npx wrangler d1 migrations apply <DATABASE_NAME> --remote",
+      "commandLanguage": "sh",
+      "safetyLevel": "state_changing",
+      "safetyEffect": "Applies any pending .sql migration files to the remote D1 database, creating or altering tables as those files specify. It does not delete existing data unless a migration file itself contains a DROP or DELETE statement."
+    },
+    {
+      "id": "n4",
+      "type": "test",
+      "title": "Check whether the binding points at a different database",
+      "body": "Confirm the `database_id` your deployed Worker is actually bound to matches the one you migrated — a stale `preview_database_id`, or a staging/production database_id mix-up in wrangler.jsonc, will produce exactly this symptom even after a correct migration run.",
+      "command": "npx wrangler d1 info <DATABASE_NAME>",
+      "commandLanguage": "sh",
+      "expectedOutput": "The database_id shown does not match the database_id in the d1_databases block your Worker is deployed with.",
+      "safetyLevel": "informational",
+      "safetyEffect": null
+    },
+    {
+      "id": "n5",
+      "type": "fix",
+      "title": "Point the binding at the correct database and redeploy",
+      "body": "Correct the `database_id` (and `preview_database_id` if relevant) in your Wrangler configuration to match the database that actually has the migration applied, then redeploy.",
+      "command": "npx wrangler deploy",
+      "commandLanguage": "sh",
+      "safetyLevel": "state_changing",
+      "safetyEffect": "Redeploys the Worker so it binds to the D1 database that has the migration applied. No data in either database is modified by this step."
+    },
+    {
+      "id": "n6",
+      "type": "terminal",
+      "title": "Not a target/binding mismatch — escalate",
+      "body": "If the migration is applied to the right database and the binding is correct, check whether `migrations_table` was customised away from the default and the table really was created but under a name or in a way you're not querying — or check the migration file itself for a typo in the table name."
+    },
+    {
+      "id": "n7",
+      "type": "verification",
+      "title": "Confirm the table exists where you're querying it",
+      "body": "List the tables directly against the same target (local/remote) your Worker queries at runtime.",
+      "command": "npx wrangler d1 execute <DATABASE_NAME> --remote --command \"SELECT name FROM sqlite_master WHERE type='table';\"",
+      "commandLanguage": "sh",
+      "expectedOutput": "The table you expected appears in the result set.",
+      "safetyLevel": "informational",
+      "safetyEffect": null
+    },
+    {
+      "id": "n8",
+      "type": "terminal",
+      "title": "Resolved",
+      "body": "The correct database has the migration applied and the Worker is bound to that database; the query now succeeds."
+    },
+    {
+      "id": "n9",
+      "type": "test",
+      "title": "Check whether the binding has a preview_database_id",
+      "body": "A D1 binding may carry both `database_id` and `preview_database_id`. `wrangler dev` connects to the **preview** one when it is set, and `wrangler d1 migrations apply` targets the database you name on the command line — so the two can be different databases while both fields look correct.",
+      "command": "npx wrangler d1 info <PREVIEW_DATABASE_NAME> --remote",
+      "commandLanguage": "sh",
+      "expectedOutput": "A preview_database_id is present in wrangler.jsonc and names a different database from database_id.",
+      "safetyLevel": "informational",
+      "safetyEffect": null
+    },
+    {
+      "id": "n10",
+      "type": "fix",
+      "title": "Apply the migration to the preview database, or remove the preview binding",
+      "body": "Either apply the migration to the preview database as well, or drop `preview_database_id` so local development uses the same database as deployment. Applying to both is usually right while the schema is still moving; removing it is right once it has settled.",
+      "command": "npx wrangler d1 migrations apply <PREVIEW_DATABASE_NAME> --remote",
+      "commandLanguage": "sh",
+      "expectedOutput": null,
+      "safetyLevel": "state_changing",
+      "safetyEffect": "Applies pending migration files to the preview D1 database, creating or altering tables as those files specify."
+    }
+  ],
+  "edges": [
+    {
+      "from": "n1",
+      "to": "n2",
+      "condition": "passed"
+    },
+    {
+      "from": "n2",
+      "to": "n3",
+      "condition": "passed"
+    },
+    {
+      "from": "n2",
+      "to": "n4",
+      "condition": "failed"
+    },
+    {
+      "from": "n2",
+      "to": "n3",
+      "condition": "unknown"
+    },
+    {
+      "from": "n4",
+      "to": "n5",
+      "condition": "passed"
+    },
+    {
+      "from": "n4",
+      "to": "n9",
+      "condition": "failed"
+    },
+    {
+      "from": "n4",
+      "to": "n9",
+      "condition": "unknown"
+    },
+    {
+      "from": "n3",
+      "to": "n7",
+      "condition": "passed"
+    },
+    {
+      "from": "n5",
+      "to": "n7",
+      "condition": "passed"
+    },
+    {
+      "from": "n7",
+      "to": "n8",
+      "condition": "passed"
+    },
+    {
+      "from": "n7",
+      "to": "n6",
+      "condition": "failed"
+    },
+    {
+      "from": "n7",
+      "to": "n6",
+      "condition": "unknown"
+    },
+    {
+      "from": "n9",
+      "to": "n10",
+      "condition": "passed"
+    },
+    {
+      "from": "n9",
+      "to": "n6",
+      "condition": "failed"
+    },
+    {
+      "from": "n9",
+      "to": "n6",
+      "condition": "unknown"
+    },
+    {
+      "from": "n10",
+      "to": "n7",
+      "condition": "passed"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://developers.cloudflare.com/d1/reference/migrations/",
+      "title": "Migrations",
+      "type": "official_docs",
+      "publisher": "Cloudflare"
+    },
+    {
+      "url": "https://developers.cloudflare.com/d1/best-practices/local-development/",
+      "title": "Local development",
+      "type": "official_docs",
+      "publisher": "Cloudflare"
+    }
+  ],
+  "changeSummary": "Adds a third cause. The original revision handled a migration applied to the wrong local/remote target and a binding pointing at the wrong database_id, then escalated. It had no branch for a preview_database_id set on the binding, which is what wrangler dev actually connects to — so a reader whose migration and database_id were both correct reached “escalate” with the real cause unexamined. New test node and fix inserted on the path that previously dead-ended."
+}
