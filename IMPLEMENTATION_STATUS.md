@@ -361,7 +361,10 @@ the superseded revision keeps its own evidence at its own URL. Asserted in
 
 ### What is not done
 
-- **The deployed consumer has still never structured a real contribution.** The credential
+- ~~**The deployed consumer has still never structured a real contribution.**~~ It has, once,
+  on 23 August 2026 — traced end to end through the production queue and recorded in
+  `docs/evidence/pipeline-e2e-2026-08-23.md`. What follows is the state before that run,
+  kept because the credential-placement history is the useful part. The credential
   is now in the right place — `ANTHROPIC_API_KEY` was on `devyou-app`, the public Worker
   that has no code to read it, and was moved to `devyou-jobs` and deleted from `devyou-app`
   on 22 August 2026 — and the boundary itself is now proven against the live API:

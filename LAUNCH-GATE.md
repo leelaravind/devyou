@@ -43,8 +43,8 @@ else on this page matters.
 | 3 | A pasted error resolves to the right playbook | ✅ MRR 0.809, hit@3 88.9%, false-positive 0.0% |
 | 4 | The diagnostic flow works without JavaScript | ✅ 10 tests with JS disabled |
 | 5 | Evidence is segmented by environment, never averaged | ✅ compatibility matrix + conflict sentences |
-| 6 | Sign-in works, or says plainly that it is unconfigured | ⚠️ **unconfigured path verified; OAuth round-trip untested** — blocked on A0-4. Unrelated to admin access, which uses Cloudflare Access, not GitHub |
-| 7 | Malicious prompt text stays data; malformed model output fails safely | ✅ 10/10 against the real provider; the deployed consumer has not yet run a live contribution |
+| 6 | Sign-in works, or says plainly that it is unconfigured | ✅ real browser round trip in production; account created as `contributor` with no email and no capability |
+| 7 | Malicious prompt text stays data; malformed model output fails safely | ✅ 10/10 against the real provider, **and** one live contribution traced end to end through the production queue — see §4 |
 | 8 | A reproduction can be filed in 10–30 seconds | ✅ |
 | 9 | Historical revisions survive and keep their own evidence | ✅ 11 tests against production |
 | 10 | Admin refuses everything until Access is configured | ✅ Access enforcing on every path; Worker still fails closed on a variable-name mismatch (§5) |
@@ -90,8 +90,27 @@ contribution end to end. Doing so writes production data and is an owner decisio
 four-entry corpus plus a model's refusal is a behaviour, not a guarantee — the structural
 controls are what hold regardless.
 
-**Sign-in is unconfigured.** Blocked on A0-4. Everything else works; reports filed now
-are shown and not counted, which the form says before submission.
+**Sign-in works, verified in a real browser.** A GitHub account is created as
+`contributor`, which holds no capability, with no email stored — so it is structurally
+incapable of colliding with an Access-matched administrator account. `packages/auth` had
+tests for `capabilities.ts` and nothing else; the state check, cookie attributes, session
+revocation and account upsert are now covered by 27 tests in `apps/app/test/auth.test.ts`.
+
+**The contribution pipeline has run end to end in production, once.**
+[`docs/evidence/pipeline-e2e-2026-08-23.md`](docs/evidence/pipeline-e2e-2026-08-23.md).
+One submission → `devyou-events-production` → `devyou-jobs` → a real `claude-opus-5` call
+(3994 in / 3943 out, $0.1185, no repair) → 22 provenance rows → `awaiting_review`. The 43
+playbooks, 44 published revisions and 110 evidence records were untouched, and nothing was
+published.
+
+Two findings came out of it, both recorded rather than quietly fixed. **The model
+classifies its own output's provenance**, so the `unconfirmed_ai_fields` blocker is only as
+strong as the model's willingness to admit it inferred something — in this run it declared
+all 22 fields `ai_extracted` and that blocker never fired. What stopped publication was the
+deterministic requirement to state environment constraints. And **`effectiveSafety` can
+raise a command's safety level but never lower it**, so the model rating a read-only
+`SELECT 1` as `destructive` stands uncorrected — the same warning-fatigue defect already
+fixed once in `packages/security`, reachable again through the AI path.
 
 **The admin surface has one administrator, provisioned out of band.** Both halves of the
 perimeter are now live: Access authenticates at the edge, and a `users` row with
@@ -123,7 +142,7 @@ untouched because two concurrent sessions were writing.
 |---|---|---|
 | A0-1 | **Done** for `dev-admin.itisyou.app` — Access application created and enforcing on every path. See the note below | — |
 | A0-3 | Decide the public content licence and contribution terms (ADR-0013) | Opening unrestricted public contribution |
-| A0-4 | Register a GitHub OAuth app; set `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` as Worker Secrets | Sign-in, and therefore counted reproductions |
+| A0-4 | **Done** — OAuth app registered, both secrets on `devyou-app`, sign-in verified in a real browser on 23 August 2026 | — |
 | — | **Done** — `ANTHROPIC_API_KEY` moved to `devyou-jobs` and deleted from `devyou-app` | — |
 
 ### A0-1, verified 22 August 2026
