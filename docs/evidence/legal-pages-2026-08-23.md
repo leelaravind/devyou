@@ -82,11 +82,22 @@ restoring the author's own saved state is deliberately allowed.
   recorded as open.
 - No company/ICO/VAT/phone identifiers anywhere in the new documents, by test.
 
-## Not done, stated plainly
+## Production — `https://dev.itisyou.app`, version `ac6aa652`
 
-**Production is not deployed.** The staging deploy was permitted; the production
-deploy (`pnpm run deploy:production` in `apps/app`) was blocked by this session's
-permission gate and was not worked around. Everything above is therefore
-VERIFIED STAGING, not VERIFIED PRODUCTION. The deploy is one command, run from
-`apps/app`, and `tests/e2e` with `BASE_URL=https://dev.itisyou.app` afterwards
-re-verifies all 116 tests against production.
+The production deploy could not be run by the implementing session (blocked by its
+permission gate, twice, and not worked around); the owner ran
+`pnpm run deploy:production` in-session on 23 August 2026. Verified immediately
+afterwards, anonymously:
+
+```
+all six legal routes            -> 200, approved address present, effective date present
+home page footer                -> all 6 legal links present
+sitemap.xml                     -> 6 legal <loc> entries
+/contribute                     -> links /contribution-terms
+/sign-in                        -> configured branch renders "Signing in is covered by
+                                   the terms of use and the privacy notice"
+/p/<real playbook>/report       -> renders the contribution-terms line
+full Playwright suite           -> 116/116 with BASE_URL=https://dev.itisyou.app
+```
+
+The legal document set is therefore **VERIFIED PRODUCTION**.

@@ -48,14 +48,15 @@ refusing every request until owner action A0-1. Staging mirrors all three.
 Full assessment: [`LAUNCH-GATE.md`](LAUNCH-GATE.md) and
 [`DEPLOYMENT-REPORT.md`](DEPLOYMENT-REPORT.md).
 
-**Legal document set (ADR-0013): VERIFIED STAGING — production deploy pending owner.**
+**Legal document set (ADR-0013): VERIFIED PRODUCTION.**
 Six public routes (`/privacy`, `/terms`, `/contribution-terms`, `/content-policy`,
 `/acceptable-use`, `/ai`), a footer legal nav on every page, contribution-terms links on
 every submission surface, and an Anthropic disclosure at the point of capture. 67
 source-level guards in `apps/app/test/legal.node.test.ts`, 18 Playwright tests across
-both viewports, 116/116 E2E against staging (7 visual baselines deliberately
-regenerated for the intended footer change). The production deploy was not permitted
-from the implementing session; `pnpm run deploy:production` in `apps/app` ships it.
+both viewports, and 116/116 E2E against staging **and** against production (7 visual
+baselines deliberately regenerated for the intended footer change). The production
+deploy itself was run by the owner — the implementing session's permission gate blocked
+it, twice, and was not worked around.
 Evidence: [`docs/evidence/legal-pages-2026-08-23.md`](docs/evidence/legal-pages-2026-08-23.md).
 The **outbound public reuse licence** over published playbooks remains an open owner
 decision — ADR-0013 records why it has a clock on it.
