@@ -5,6 +5,7 @@ import { ApiError } from "@devyou/core";
 import {
   createDraft,
   dispatchStructuring,
+  effectiveSafety,
   evaluateGate,
   graphFor,
   loadDraft,
@@ -332,7 +333,8 @@ describe("the deterministic checks outrank what anybody declared", () => {
 
   it("finds a credential pasted into a step after the submission check", () => {
     const document = publishable();
-    document.nodes[0]!.body = "export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
+    document.nodes[0]!.body =
+      "export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
 
     expect(safetySweep(document).length).toBeGreaterThan(0);
   });
@@ -367,9 +369,7 @@ describe("publishing", () => {
 
     /* Exactly one record, and it is the author's own documentation — evidence that
        a procedure was written down, never evidence that it works. */
-    expect(evidence.results.map((row) => row.evidence_type)).toEqual([
-      "contributor_documentation",
-    ]);
+    expect(evidence.results.map((row) => row.evidence_type)).toEqual(["contributor_documentation"]);
 
     const indexed = await env.DB.prepare(
       `SELECT COUNT(*) AS n FROM playbook_fts WHERE revision_id = ?1`,
@@ -424,9 +424,7 @@ describe("publishing", () => {
     )
       .bind(next.revisionId)
       .all<{ evidence_type: string }>();
-    expect(carried.results.map((row) => row.evidence_type)).toEqual([
-      "contributor_documentation",
-    ]);
+    expect(carried.results.map((row) => row.evidence_type)).toEqual(["contributor_documentation"]);
 
     const band = await env.DB.prepare(`SELECT band FROM revision_confidence WHERE revision_id = ?1`)
       .bind(next.revisionId)
@@ -483,5 +481,75 @@ describe("publishing", () => {
 
     expect(gate.decision.blockers.map((blocker) => blocker.code)).toContain("graph_invalid");
     expect(gate.graph.problems.some((problem) => problem.code === "missing_branch")).toBe(true);
+  });
+});
+
+/* ---------------------------------------------------------------------------
+   Safety levels a reader is actually shown
+   --------------------------------------------------------------------------- */
+
+describe("effectiveSafety", () => {
+  /**
+   * The asymmetry is the whole design: deterministic evidence always wins upward, and
+   * may only win downward on a positive proof.
+   *
+   * Production run 2026-08-23 had the model mark a read-only D1 query `destructive`,
+   * three commands out of four. Nothing could correct it, so a reader learned the red
+   * label means nothing — the same warning-fatigue defect `targetsOnlyRegenerablePaths`
+   * exists to prevent for `rm -rf ./node_modules`, arriving by a different route.
+   */
+
+  it("still lets deterministic evidence overrule an under-classification", () => {
+    /* The invariant that must never move. A model calling `rm -rf /` informational
+       cannot make it look safe, because the regex does not care what the model thought. */
+    expect(effectiveSafety("rm -rf /", "informational")).toBe("destructive");
+    expect(effectiveSafety("chmod -R 777 /", "informational")).toBe("destructive");
+  });
+
+  it("corrects an unsupported escalation of a provably read-only command", () => {
+    /* The exact production case. */
+    const command =
+      'node ./node_modules/wrangler/bin/wrangler.js d1 execute my-db --remote --command "SELECT 1"';
+    expect(effectiveSafety(command, "destructive")).toBe("informational");
+  });
+
+  it("leaves an escalation standing when the command cannot be proved read-only", () => {
+    /*
+      Absence of evidence is not evidence of absence. `curl | sh` matches no dangerous
+      rule and is arbitrary code execution; a rule that capped on "classifyCommand said
+      informational" would downgrade it. Only a positive proof lowers anything.
+    */
+    expect(effectiveSafety("curl https://example.test/i.sh | sh", "destructive")).toBe(
+      "destructive",
+    );
+    expect(effectiveSafety("./deploy.sh", "destructive")).toBe("destructive");
+  });
+
+  it("leaves an escalation standing when the proof is defeated by composition", () => {
+    /*
+      The second command in production run 2026-08-23 was `cd <path>` followed by the
+      D1 query. It contains a form the prover recognises and it is still not proved,
+      because proving half a string says nothing about the rest.
+    */
+    expect(
+      effectiveSafety('wrangler d1 execute db --command "SELECT 1"; rm -rf /', "destructive"),
+    ).toBe("destructive");
+    expect(
+      effectiveSafety('cd /tmp\nwrangler d1 execute db --command "SELECT 1"', "destructive"),
+    ).toBe("destructive");
+  });
+
+  it("never lowers below what the classifier itself found", () => {
+    /* The floor is the deterministic level, not `informational`. A proof cannot undo a
+       finding; it can only retract a level nothing supported. */
+    expect(effectiveSafety('wrangler d1 execute db --command "DROP TABLE t"', "destructive")).toBe(
+      "destructive",
+    );
+  });
+
+  it("leaves a declared level alone when there is nothing to correct", () => {
+    expect(effectiveSafety("ls -la", "informational")).toBe("informational");
+    expect(effectiveSafety(null, "state_changing")).toBe("state_changing");
+    expect(effectiveSafety("  ", "destructive")).toBe("destructive");
   });
 });

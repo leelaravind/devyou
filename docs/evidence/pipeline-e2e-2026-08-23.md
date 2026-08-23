@@ -241,3 +241,134 @@ pnpm run test          # 16/16 suites; app 52, admin 134
 
 The draft is deliberately left in place at `awaiting_review` rather than deleted. Deleting
 the evidence of a verification to tidy up is how a verification becomes a claim.
+
+---
+
+## 7. The three findings, fixed — 23 August 2026
+
+### Finding 1: environment data recognised, then dropped
+
+**Root cause, two independent losses on the same path.**
+
+`apps/jobs/src/structure.ts` mapped the model's answer onto a draft with
+`constraints: []` **hard-coded**. `StructureResult.technologies[].versionLabel` was
+declared in the schema, validated by Zod, and then never read — `toDraft` mapped only
+`slugify(name)` into `technologySlugs` and discarded the version beside it.
+
+Separately, that slug was matched against canonical slugs only. The model said `Node`;
+`slugify` gives `node`; the taxonomy stores `nodejs`; the match failed and the
+technology was dropped in silence, taking its version with it. `technology_aliases`
+holds 171 rows for exactly this — `node` **is** an alias of `nodejs` in production — and
+the structuring path was the one place that never consulted it.
+
+Nothing downstream was at fault. The editor already renders, parses, adds and removes
+constraints (`contribute.$draftId.edit.tsx`, `parseConstraints`); the publish gate
+already refuses without them. The gate did its job and made a transit loss look like
+the author's omission.
+
+**Fix.** `technologyResolver` builds a name→slug map from slugs *and* unambiguously
+resolving aliases; an alias pointing at more than one technology is omitted rather than
+guessed (`wrangler` is both a slug and an alias of `cloudflare-workers`, and the slug
+wins). Versioned technologies become `known_affected` constraints pinned to the reported
+version — the author said it broke *here*, not that it breaks from here onwards, and
+widening belongs on the review screen.
+
+**The gate was not weakened.** Only a technology *with a version* produces a constraint.
+A version-less row would satisfy `constraints.length > 0` while carrying no
+applicability, turning `no_environment_constraints` into a formality. Asserted directly
+by `does NOT invent a constraint for a technology with no version`.
+
+### Finding 2: the model classified its own provenance
+
+**Root cause.** `toDraft` wrote `provenance: result.problemTitle.provenance` — the
+model's own label — and hard-coded `ai_extracted` for node fields. The label deciding
+whether a human must look was assigned by the thing being checked. In production the
+model declared all 22 fields `ai_extracted` and `unconfirmed_ai_fields` never fired.
+
+**A worse hole found while fixing it:** `commandText` had **no provenance row at all**.
+The tracked list was `title`, `body`, `expectedOutput`. A fabricated command required no
+confirmation and reached the gate indistinguishable from one the author typed — and a
+command is the one field a reader copies and executes. Two of the four commands in this
+very draft contain invented placeholders.
+
+**Fix.** `packages/domain/src/grounding.ts`. `groundedProvenance` downgrades any claim
+of `user_supplied` or `ai_extracted` that is not present in the submission, after
+normalisation for case, whitespace, smart quotes and dashes. It can only ever *reduce*
+trust; there is no input that raises it.
+
+**Scope, chosen from measurement rather than taste.** Grounding is applied to literals —
+commands, expected output, version labels — and not to prose. Against this submission,
+normalised containment held for **1 of 22** prose fields and token coverage ran 0.00 to
+1.00 with faithful text at both ends: the terminal step "Resolved, or cause lies
+elsewhere" scores 0.00 and is harmless scaffolding. Any threshold over prose would
+demand confirmation on nearly every field of a legitimate draft, which is the
+warning-fatigue defect of Finding 3 rebuilt somewhere new. Prose keeps the model's label
+and stays fully visible on the review screen.
+
+Verified against the stored production draft with the deployed code:
+
+```
+node 0  verbatim     -> ai_extracted                        (genuine)
+node 1  unsupported  -> ai_inferred_requires_confirmation   (invented placeholder)
+node 4  verbatim     -> ai_extracted                        (genuine)
+node 5  unsupported  -> ai_inferred_requires_confirmation   (invented placeholder)
+```
+
+### Finding 3: AI could escalate a read-only command with no correction
+
+**Root cause.** `effectiveSafety` returned `max(classifyCommand, declared)`. Right
+direction for danger, but it left an unsupported escalation permanent: the model marked
+`wrangler ... d1 execute my-db --remote --command "SELECT 1"` — a read — `destructive`.
+
+**Fix.** `isProvablyReadOnly` in `packages/security`. It is deliberately **not**
+`classifyCommand` inverted: that function returning `informational` means "no rule
+matched", which is absence of evidence (`curl x | sh` scores `informational`). This one
+returns `true` only for forms it positively recognises and `false` for everything it does
+not understand, which is what makes the `true` safe to act on. `effectiveSafety` keeps
+the upward rule untouched and lowers only on a proof, never below what the classifier
+itself found.
+
+`isReadOnlySql` strips both comment syntaxes, splits on `;`, requires every statement to
+head with `select`/`explain`/`with`, and bans every write, schema, transaction and
+`attach` keyword anywhere in the string. `PRAGMA` is refused outright — several pragmas
+write, and telling those apart is a larger surface than the value of proving one safe.
+`--file` is refused because the SQL is then unreadable, and an unreadable statement is an
+unproven one. Shell composition (`; && || | < > $( \n`) defeats the proof before the
+allow-list is consulted.
+
+Verified against the stored production draft with the deployed code:
+
+```
+node 0  destructive   -> informational   the false positive, corrected
+node 1  destructive   -> destructive     multi-line; composition defeats the proof
+node 4  informational -> informational   unchanged
+node 5  destructive   -> destructive     contains `<...>`, which is redirection syntax
+```
+
+One of three false positives corrected; the other two stay flagged because they contain
+invented placeholder syntax that is *also* shell metacharacter. That is the conservative
+answer and the right one — those two are the commands the author never wrote.
+
+### Test evidence
+
+| Suite | Before | After |
+|---|---|---|
+| `@devyou/domain` | 66 | **84** |
+| `@devyou/security` | 82 | **97** |
+| `@devyou/app` | 52 | **58** |
+| `@devyou/jobs` | 0 | **10** |
+| `@devyou/admin` | 134 | 134 (unchanged, still green) |
+
+typecheck 19/19, lint clean, 16/16 suites. Secret placement unchanged. No production
+corpus row was modified: playbooks 43, published revisions 44, evidence 110, drafts 1,
+ai_tasks 1 — identical before and after deployment.
+
+### Remaining limitation
+
+**The persisted draft cannot be migrated.** Only the mapped `DraftDocument` is stored,
+never the raw `StructureResult`, so `versionLabel` — dropped at map time — is
+unrecoverable for `drf_01M0PK2YT8T597NK4ZW81YYCDD`. Findings 1 and 2 therefore cannot be
+retro-applied to it without a fresh structuring call.
+
+Finding 3 needs no reprocessing: `effectiveSafety` is recomputed at render and at the
+gate, so the correction above is live for that draft now.

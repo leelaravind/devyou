@@ -274,7 +274,8 @@ const RULES: Rule[] = [
   {
     pattern: "dd",
     level: "destructive",
-    explanation: "Writes raw blocks; the wrong `of=` target overwrites a disk or partition with no warning.",
+    explanation:
+      "Writes raw blocks; the wrong `of=` target overwrites a disk or partition with no warning.",
     test: (command) => /\bdd\b[^\n;]*\b(if|of)=/i.test(command),
   },
   {
@@ -286,7 +287,8 @@ const RULES: Rule[] = [
   {
     pattern: "redirect to a raw block device",
     level: "destructive",
-    explanation: "Writing directly to /dev/sd*, /dev/hd*, /dev/nvme* or /dev/xvd* can destroy a disk's contents.",
+    explanation:
+      "Writing directly to /dev/sd*, /dev/hd*, /dev/nvme* or /dev/xvd* can destroy a disk's contents.",
     test: (command) => />\s*\/dev\/(sd|hd|nvme|xvd)\w*/i.test(command),
   },
   {
@@ -316,13 +318,15 @@ const RULES: Rule[] = [
   {
     pattern: "chown -R",
     level: "state_changing",
-    explanation: "Recursively changes ownership; can lock out a service account or break existing permissions.",
+    explanation:
+      "Recursively changes ownership; can lock out a service account or break existing permissions.",
     test: isChownRecursive,
   },
   {
     pattern: "DROP / TRUNCATE",
     level: "destructive",
-    explanation: "Removes an entire table, database, schema or index. There is no WHERE clause to narrow this.",
+    explanation:
+      "Removes an entire table, database, schema or index. There is no WHERE clause to narrow this.",
     test: (command) => SQL_DROP_TRUNCATE_RE.test(command),
   },
   {
@@ -334,13 +338,15 @@ const RULES: Rule[] = [
   {
     pattern: "docker system prune",
     level: "destructive",
-    explanation: "Removes stopped containers, unused networks, dangling images and (with -a/--volumes) volumes.",
+    explanation:
+      "Removes stopped containers, unused networks, dangling images and (with -a/--volumes) volumes.",
     test: (command) => /\bdocker\s+system\s+prune\b/i.test(command),
   },
   {
     pattern: "kubectl delete",
     level: "destructive",
-    explanation: "Deletes a live cluster resource — a pod, deployment, namespace or persistent volume claim.",
+    explanation:
+      "Deletes a live cluster resource — a pod, deployment, namespace or persistent volume claim.",
     test: (command) => /\bkubectl\s+delete\b/i.test(command),
   },
   {
@@ -352,13 +358,15 @@ const RULES: Rule[] = [
   {
     pattern: "git push --force",
     level: "destructive",
-    explanation: "Overwrites remote history. Anyone who already pulled the old history can lose commits.",
+    explanation:
+      "Overwrites remote history. Anyone who already pulled the old history can lose commits.",
     test: isGitPushForce,
   },
   {
     pattern: "git clean -f",
     level: "destructive",
-    explanation: "Permanently deletes untracked (and, with -d/-x, ignored) files with no way to undo it via git.",
+    explanation:
+      "Permanently deletes untracked (and, with -d/-x, ignored) files with no way to undo it via git.",
     test: isGitCleanForce,
   },
   {
@@ -372,13 +380,15 @@ const RULES: Rule[] = [
   {
     pattern: "eval",
     level: "destructive",
-    explanation: "Executes a constructed string as a command. What actually runs is opaque until it does.",
+    explanation:
+      "Executes a constructed string as a command. What actually runs is opaque until it does.",
     test: (command) => /\beval\b/i.test(command),
   },
   {
     pattern: "decode and execute",
     level: "destructive",
-    explanation: "A base64-decoded payload piped into an interpreter — the actual command is hidden from a skim-read.",
+    explanation:
+      "A base64-decoded payload piped into an interpreter — the actual command is hidden from a skim-read.",
     test: (command) => BASE64_EXEC_RE.test(command),
   },
   {
@@ -392,13 +402,15 @@ const RULES: Rule[] = [
   {
     pattern: "clear shell history",
     level: "state_changing",
-    explanation: "Erases the local command history. Legitimate uses exist, but it is also a common anti-forensic step.",
+    explanation:
+      "Erases the local command history. Legitimate uses exist, but it is also a common anti-forensic step.",
     test: (command) => HISTORY_EVASION_RE.test(command),
   },
   {
     pattern: "write into ~/.ssh",
     level: "credential_sensitive",
-    explanation: "Writes into an SSH key directory — a common way to plant or overwrite key material.",
+    explanation:
+      "Writes into an SSH key directory — a common way to plant or overwrite key material.",
     test: (command) => SSH_WRITE_RE.test(command),
   },
   {
@@ -422,7 +434,10 @@ function highestLevel(levels: readonly SafetyLevel[]): SafetyLevel {
  * it. The overall level is the highest level among all findings; the default,
  * when nothing matches, is `"informational"` — never absence of a result.
  */
-export function classifyCommand(command: string): { level: SafetyLevel; findings: CommandFinding[] } {
+export function classifyCommand(command: string): {
+  level: SafetyLevel;
+  findings: CommandFinding[];
+} {
   const findings: CommandFinding[] = [];
   for (const rule of RULES) {
     if (rule.test(command)) {
@@ -442,4 +457,135 @@ export function classifyCommand(command: string): { level: SafetyLevel; findings
  */
 export function looksLikeSecret(text: string): boolean {
   return matchesAnySecretPattern(text);
+}
+
+/* ---------------------------------------------------------------------------
+   Positive proof of read-only
+   --------------------------------------------------------------------------- */
+
+/**
+ * Whether a command can be *proved* to change nothing.
+ *
+ * This is not the negation of `classifyCommand`. That function returns
+ * `informational` when no dangerous rule matched, which is absence of evidence —
+ * `curl x | sh` scores `informational` and is arbitrary code execution. Nothing may
+ * ever be downgraded on the strength of "we found no problem".
+ *
+ * This function is the opposite shape: it returns `true` only for command forms it
+ * positively recognises as reads, and `false` for everything else including
+ * everything it does not understand. The default answer is "cannot prove it", and
+ * that default is what makes it safe to act on the `true`.
+ *
+ * It exists because a *false* danger signal has a cost too. The AI structuring path
+ * lets a model propose a safety level, and a model told "if you are unsure whether
+ * something is destructive, say it is" will mark a read-only query `destructive`.
+ * Left uncorrected, a reader learns that the red label means nothing — which is the
+ * same defect `targetsOnlyRegenerablePaths` exists to prevent for `rm -rf`, arriving
+ * by a different route.
+ */
+
+/** Anything that could chain, redirect, substitute or expand into a second command.
+ *  If one of these is present the string is more than one command and this function
+ *  does not attempt to reason about it. */
+const SHELL_COMPOSITION_RE = /[;&|<>`\n\r]|\$\(|\$\{|\|\||&&/;
+
+/** Statements that read. `explain` is included because `EXPLAIN` and
+ *  `EXPLAIN QUERY PLAN` compile a statement without running it — but only when the
+ *  statement being explained is itself read-only, which the keyword ban below
+ *  enforces over the whole string. */
+const READ_ONLY_SQL_HEAD_RE = /^(select|explain|with)\b/;
+
+/**
+ * Every keyword that can write, alter schema, change transaction state, or reach
+ * outside the current database.
+ *
+ * `pragma` is here deliberately: several pragmas write (`journal_mode`,
+ * `user_version`, `foreign_keys`), and distinguishing the readable ones from the
+ * writable ones is a bigger surface than the value of proving a pragma safe.
+ * `attach`/`detach` are here because they reach another file. `with` is permitted as
+ * a *head* above but a CTE followed by `INSERT ... SELECT` is a write, and this ban
+ * catches it because the keyword appears somewhere in the statement.
+ */
+const WRITE_SQL_KEYWORD_RE =
+  /\b(insert|update|delete|drop|alter|create|replace|truncate|attach|detach|pragma|vacuum|reindex|begin|commit|rollback|savepoint|release|analyze)\b/;
+
+/** Strip SQL comments before any keyword test. `SELECT 1 -- ; DROP TABLE t` and
+ *  `SELECT/*x*\/1` both exist to defeat a naive scanner. */
+function stripSqlComments(sql: string): string {
+  return sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
+}
+
+/**
+ * Whether every statement in a SQL string is a read.
+ *
+ * Exported for its own tests: the interesting cases (a write hidden after a
+ * comment, a second statement after a semicolon, a CTE that inserts) are properties
+ * of this function rather than of the command wrapping it.
+ */
+export function isReadOnlySql(sql: string): boolean {
+  const cleaned = stripSqlComments(sql).toLowerCase();
+  if (WRITE_SQL_KEYWORD_RE.test(cleaned)) return false;
+
+  const statements = cleaned
+    .split(";")
+    .map((statement) => statement.trim())
+    .filter((statement) => statement !== "");
+
+  /* An empty string is not a proof of anything. */
+  if (statements.length === 0) return false;
+
+  return statements.every((statement) => READ_ONLY_SQL_HEAD_RE.test(statement));
+}
+
+/** The `--command "<sql>"` / `--command=<sql>` operand, or null when absent or not
+ *  a single quoted literal this function can read. */
+function d1CommandOperand(command: string): string | null {
+  const quoted = /--command(?:=|\s+)(["'])([\s\S]*?)\1/.exec(command);
+  if (quoted) return quoted[2] ?? null;
+  return null;
+}
+
+/**
+ * Whether the command is a D1 query whose SQL is visible and read-only.
+ *
+ * `wrangler d1 execute` is matched however it was invoked — bare, through `npx`, or
+ * as `node .../wrangler.js`, which is the form that appears when somebody works
+ * around pnpm's non-hoisted layout. What is *not* accepted is `--file`, because the
+ * SQL then lives somewhere this function cannot see, and an unreadable statement is
+ * an unproven one.
+ */
+function isReadOnlyD1Execute(command: string): boolean {
+  if (!/\bd1\s+execute\b/.test(command)) return false;
+  if (!/\bwrangler\b/.test(command)) return false;
+  if (/--file\b/.test(command)) return false;
+
+  const sql = d1CommandOperand(command);
+  return sql !== null && isReadOnlySql(sql);
+}
+
+/**
+ * The allow-list. Each entry recognises one command form and proves it reads.
+ *
+ * Deliberately short. Every addition is a new way for something to be marked safe,
+ * so this grows one reviewed entry at a time rather than by pattern-matching on
+ * "looks harmless".
+ */
+const READ_ONLY_PROOFS: ReadonlyArray<{ name: string; test: (command: string) => boolean }> = [
+  { name: "wrangler d1 execute with a read-only --command", test: isReadOnlyD1Execute },
+];
+
+export function isProvablyReadOnly(command: string): boolean {
+  const trimmed = command.trim();
+  if (trimmed === "") return false;
+
+  /*
+    Composition is checked before the allow-list, not after.
+
+    `wrangler d1 execute db --command "SELECT 1"; rm -rf /` contains a form this
+    module recognises, and proving the recognised half says nothing about the rest.
+    A string holding more than one command is never proved here.
+  */
+  if (SHELL_COMPOSITION_RE.test(trimmed)) return false;
+
+  return READ_ONLY_PROOFS.some((proof) => proof.test(trimmed));
 }

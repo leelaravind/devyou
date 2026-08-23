@@ -15,6 +15,7 @@
   "dependencies": {
     "@devyou/ai": "workspace:*",
     "@devyou/core": "workspace:*",
+    "@devyou/domain": "workspace:*",
     "@devyou/schemas": "workspace:*",
     "zod": "^4.4.3"
   },

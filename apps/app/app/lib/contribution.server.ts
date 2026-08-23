@@ -5,8 +5,20 @@ import {
   readFieldPath,
   type DraftFieldProvenance,
 } from "@devyou/schemas";
-import { INITIAL_BAND, canPublish, validateGraph, type GraphEdge, type GraphNode } from "@devyou/domain";
-import { classifyCommand, checkUrl, looksLikeSecret, scanUnicode } from "@devyou/security";
+import {
+  INITIAL_BAND,
+  canPublish,
+  validateGraph,
+  type GraphEdge,
+  type GraphNode,
+} from "@devyou/domain";
+import {
+  classifyCommand,
+  isProvablyReadOnly,
+  checkUrl,
+  looksLikeSecret,
+  scanUnicode,
+} from "@devyou/security";
 import {
   INSERT_DOCUMENT_SQL,
   INSERT_SIGNATURE_DOCUMENT_SQL,
@@ -40,13 +52,7 @@ import {
  */
 
 export type DraftStatus =
-  | "capturing"
-  | "structuring"
-  | "awaiting_review"
-  | "editing"
-  | "ready"
-  | "published"
-  | "abandoned";
+  "capturing" | "structuring" | "awaiting_review" | "editing" | "ready" | "published" | "abandoned";
 
 export interface DraftRecord {
   id: string;
@@ -331,7 +337,11 @@ export async function saveDocument(
     .run();
 }
 
-export async function abandonDraft(db: D1Database, draftId: string, authorId: string): Promise<void> {
+export async function abandonDraft(
+  db: D1Database,
+  draftId: string,
+  authorId: string,
+): Promise<void> {
   /*
     Abandoning sets a status. It does not delete anything.
 
@@ -541,10 +551,44 @@ const SEVERITY: readonly SafetyLevel[] = [
   "credential_sensitive",
 ];
 
+/**
+ * The safety level a reader is actually shown.
+ *
+ * Two rules, and the asymmetry between them is the point.
+ *
+ * **Deterministic evidence always wins upward.** If `classifyCommand` finds
+ * something more dangerous than the author or the model declared, that wins. A model
+ * that under-classifies `rm -rf /` cannot make it look safe, because the regex does
+ * not care what the model thought. This direction is never negotiable.
+ *
+ * **Deterministic evidence may also correct a false alarm downward — but only on
+ * positive proof.** `isProvablyReadOnly` returns true for command forms it
+ * recognises as reads and false for everything else, including everything it does
+ * not understand. That is a different thing from `classifyCommand` returning
+ * `informational`, which only means no rule matched: `curl x | sh` scores
+ * `informational` and is arbitrary code execution. Capping on "no rule matched"
+ * would be a downgrade on absence of evidence; capping on a positive proof is not.
+ *
+ * The second rule exists because a false danger signal has a cost. Production run
+ * 2026-08-23 had the model mark
+ * `wrangler ... d1 execute my-db --remote --command "SELECT 1"` as `destructive`
+ * — a read. Left standing, a reader learns the red label means nothing, which is
+ * exactly the defect `targetsOnlyRegenerablePaths` exists to prevent for
+ * `rm -rf ./node_modules`, arriving by a different route.
+ */
 export function effectiveSafety(command: string | null, declared: SafetyLevel): SafetyLevel {
   if (command === null || command.trim() === "") return declared;
+
   const { level } = classifyCommand(command);
-  return SEVERITY.indexOf(level) > SEVERITY.indexOf(declared) ? level : declared;
+  if (SEVERITY.indexOf(level) > SEVERITY.indexOf(declared)) return level;
+
+  /* Only a proof lowers anything, and it can never lower below what the classifier
+     itself found — `level` is the floor, not `informational`. */
+  if (SEVERITY.indexOf(declared) > SEVERITY.indexOf(level) && isProvablyReadOnly(command)) {
+    return level;
+  }
+
+  return declared;
 }
 
 /**
@@ -568,7 +612,10 @@ export function safetySweep(document: DraftDocument): string[] {
     ...document.nodes.flatMap((node) => [
       { label: `"${node.title || node.key}"`, text: node.body },
       { label: `the command in "${node.title || node.key}"`, text: node.commandText ?? "" },
-      { label: `the expected output of "${node.title || node.key}"`, text: node.expectedOutput ?? "" },
+      {
+        label: `the expected output of "${node.title || node.key}"`,
+        text: node.expectedOutput ?? "",
+      },
     ]),
   ];
 
@@ -585,7 +632,9 @@ export function safetySweep(document: DraftDocument): string[] {
   for (const source of document.sources) {
     const verdict = checkUrl(source.url);
     if (!verdict.safe) {
-      findings.push(`the reference ${source.url} is not a safe link: ${verdict.reason ?? "rejected"}`);
+      findings.push(
+        `the reference ${source.url} is not a safe link: ${verdict.reason ?? "rejected"}`,
+      );
     }
   }
 
@@ -598,7 +647,10 @@ export function unclassifiedCommandNodes(document: DraftDocument): string[] {
   return document.nodes
     .filter((node) => {
       if (node.commandText === null || node.commandText.trim() === "") return false;
-      return effectiveSafety(node.commandText, node.safetyLevel) !== "informational" && !node.safetyEffect;
+      return (
+        effectiveSafety(node.commandText, node.safetyLevel) !== "informational" &&
+        !node.safetyEffect
+      );
     })
     .map((node) => node.title || node.key);
 }
@@ -1018,7 +1070,9 @@ export async function publishDraft(
     problemTitle: document.problemTitle,
     problemSummary: document.problemSummary,
     errorStrings: document.errorSignatures.flatMap((signature) =>
-      [signature.errorCode, signature.normalisedMessage].filter((value): value is string => !!value),
+      [signature.errorCode, signature.normalisedMessage].filter(
+        (value): value is string => !!value,
+      ),
     ),
     symptoms: document.symptoms,
     nodes: document.nodes.map((node) => ({
@@ -1164,7 +1218,11 @@ export function seedFromRevision(input: {
     safetyLevel: SafetyLevel;
     safetyEffect: string | null;
   }>;
-  edges: ReadonlyArray<{ fromNodeId: string; toNodeId: string; conditionType: DraftDocument["edges"][number]["condition"] }>;
+  edges: ReadonlyArray<{
+    fromNodeId: string;
+    toNodeId: string;
+    conditionType: DraftDocument["edges"][number]["condition"];
+  }>;
   technologySlugs: readonly string[];
   constraints: DraftDocument["constraints"];
   sources: DraftDocument["sources"];

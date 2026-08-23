@@ -220,6 +220,9 @@ importers:
       '@devyou/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@devyou/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@devyou/schemas':
         specifier: workspace:*
         version: link:../../packages/schemas

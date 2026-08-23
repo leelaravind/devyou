@@ -10,3 +10,4 @@ export * from "./graph.js";
 export * from "./session.js";
 export * from "./revisions.js";
 export * from "./environment.js";
+export * from "./grounding.js";
