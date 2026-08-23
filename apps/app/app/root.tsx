@@ -11,6 +11,7 @@ import type { LinksFunction } from "react-router";
 import { SkipLink, TopNav, CompactSearch, Icon } from "@devyou/ui";
 
 import type { Route } from "./+types/root";
+import { LEGAL_LINKS } from "./lib/legal";
 import { cloudflareContext } from "./context/cloudflare";
 import { nonceContext } from "./context/nonce";
 import { loadAuthState } from "./lib/auth.server";
@@ -194,21 +195,38 @@ function AccountSlot({
 function SiteFooter() {
   return (
     <footer className="mt-auto border-t border-outline-variant bg-surface-container-low">
-      <div className="mx-auto flex w-full max-w-[1280px] flex-wrap items-center justify-between gap-gutter px-margin py-6 text-body-sm text-on-surface-variant">
-        <p className="font-mono text-env-tag uppercase">DEV.ITISYOU — evidence, not opinions</p>
-        <nav aria-label="Footer" className="flex flex-wrap items-center gap-gutter">
-          <a href="/about" className="hover:text-on-surface">
-            About
-          </a>
-          <a href="/how-verification-works" className="hover:text-on-surface">
-            How verification works
-          </a>
-          <a href="/sitemap.xml" className="hover:text-on-surface">
-            Sitemap
-          </a>
-          <a href="https://itisyou.app" className="hover:text-on-surface">
-            ITISYOU Network
-          </a>
+      <div className="mx-auto flex w-full max-w-[1280px] flex-col gap-3 px-margin py-6 text-body-sm text-on-surface-variant">
+        <div className="flex flex-wrap items-center justify-between gap-gutter">
+          <p className="font-mono text-env-tag uppercase">DEV.ITISYOU — evidence, not opinions</p>
+          <nav aria-label="Footer" className="flex flex-wrap items-center gap-gutter">
+            <a href="/about" className="hover:text-on-surface">
+              About
+            </a>
+            <a href="/how-verification-works" className="hover:text-on-surface">
+              How verification works
+            </a>
+            <a href="/sitemap.xml" className="hover:text-on-surface">
+              Sitemap
+            </a>
+            <a href="https://itisyou.app" className="hover:text-on-surface">
+              ITISYOU Network
+            </a>
+          </nav>
+        </div>
+        {/*
+          The legal row. Every document is readable without an account and carries its
+          own effective date; the links live in `lib/legal.ts` so this row and the
+          cross-links on the documents themselves cannot drift apart.
+        */}
+        <nav
+          aria-label="Legal"
+          className="flex flex-wrap items-center gap-x-gutter gap-y-1 border-t border-outline-variant pt-3 text-body-sm"
+        >
+          {LEGAL_LINKS.map((link) => (
+            <a key={link.href} href={link.href} className="hover:text-on-surface">
+              {link.label}
+            </a>
+          ))}
         </nav>
       </div>
     </footer>

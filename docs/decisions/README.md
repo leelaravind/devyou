@@ -19,7 +19,7 @@ superseding the old one — never by editing history.
 | 0010 | AI assistive-only authority boundary | Planned | 7 |
 | 0011 | UGC rendering and sanitisation policy | Planned | 7 |
 | 0012 | Evidence and reproduction anti-gaming policy | Planned | 8 |
-| 0013 | Public licensing and contribution terms | Planned | 14 — **owner decision** |
+| [0013](./0013-public-licensing-and-contribution-terms.md) | Public licensing and contribution terms | Accepted — outbound public licence **explicitly left open** | 14 — owner decision, 23 Aug 2026 |
 
 ## Mapping to `IMPLEMENTATION.md` §23
 

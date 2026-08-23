@@ -1,6 +1,6 @@
 # Implementation status
 
-**Updated:** 22 August 2026
+**Updated:** 23 August 2026
 **Repository:** `leelaravind/devyou` (private)
 **Product:** DevYou — `dev.itisyou.app`
 
@@ -47,6 +47,18 @@ A successful build is not `TESTED`. A successful `wrangler deploy` is not
 refusing every request until owner action A0-1. Staging mirrors all three.
 Full assessment: [`LAUNCH-GATE.md`](LAUNCH-GATE.md) and
 [`DEPLOYMENT-REPORT.md`](DEPLOYMENT-REPORT.md).
+
+**Legal document set (ADR-0013): VERIFIED STAGING — production deploy pending owner.**
+Six public routes (`/privacy`, `/terms`, `/contribution-terms`, `/content-policy`,
+`/acceptable-use`, `/ai`), a footer legal nav on every page, contribution-terms links on
+every submission surface, and an Anthropic disclosure at the point of capture. 67
+source-level guards in `apps/app/test/legal.node.test.ts`, 18 Playwright tests across
+both viewports, 116/116 E2E against staging (7 visual baselines deliberately
+regenerated for the intended footer change). The production deploy was not permitted
+from the implementing session; `pnpm run deploy:production` in `apps/app` ships it.
+Evidence: [`docs/evidence/legal-pages-2026-08-23.md`](docs/evidence/legal-pages-2026-08-23.md).
+The **outbound public reuse licence** over published playbooks remains an open owner
+decision — ADR-0013 records why it has a clock on it.
 **Created:** the DevYou-owned Cloudflare resources listed in
 [`docs/implementation/CLOUDFLARE-RESOURCES.md`](docs/implementation/CLOUDFLARE-RESOURCES.md).
 No resource belonging to another product has been created, modified or deleted.
@@ -104,7 +116,7 @@ are documented"* — is closed.
 |---|---|---|
 | A0-1 | Cloudflare Access application for the DevYou admin hostnames + its AUD tag | Phase 10 staging deploy |
 | A0-2 | Confirm DNS / custom domains for the four DevYou hostnames | First staging deploy |
-| A0-3 | Decide the public content licence and contribution terms (research recommends DCO + CC BY-SA-family, not a CLA) | Public launch, Phase 14 |
+| A0-3 | Decide the public content licence and contribution terms (research recommends DCO + CC BY-SA-family, not a CLA) — **narrowed 23 Aug 2026**: contribution terms and external-source policy decided, ADR-0013; outbound public reuse licence still open | Public launch, Phase 14 |
 
 Phases 1–9 are unblocked by all three.
 

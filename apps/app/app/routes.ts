@@ -64,6 +64,20 @@ export default [
   route("contribute", "routes/contribute.tsx"),
 
   /*
+    The legal document set. ADR-0013.
+
+    These URLs are contracts in the same way `/p/:slug` is: a privacy notice that
+    moves is a privacy notice nobody can rely on having read. All six are public,
+    readable without an account, and linked from the footer of every page.
+  */
+  route("privacy", "routes/privacy.tsx"),
+  route("terms", "routes/terms.tsx"),
+  route("contribution-terms", "routes/contribution-terms.tsx"),
+  route("content-policy", "routes/content-policy.tsx"),
+  route("acceptable-use", "routes/acceptable-use.tsx"),
+  route("ai", "routes/ai.tsx"),
+
+  /*
     The contribution pipeline. Plan §10, in the order it happens.
 
     `/contribute` is signposting and stays public; everything below it is a draft,

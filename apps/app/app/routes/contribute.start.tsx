@@ -366,6 +366,27 @@ export default function Start({ loaderData, actionData }: Route.ComponentProps) 
                 credential-shaped strings and hidden characters before it is stored — but a scanner
                 is not a substitute for reading it yourself first.
               </p>
+              {/*
+                Two disclosures that must sit at the point of submission, not in a
+                document nobody opens: what submitting agrees to, and that the text is
+                about to leave for a third-party model. ADR-0013, and the AI
+                disclosure the privacy notice promises. A link, not a checkbox — a
+                pre-ticked box is a dark pattern and an unticked one adds a click that
+                discloses nothing more than this sentence does.
+              */}
+              <p className="text-body-sm text-on-surface-variant">
+                Submitting is covered by the{" "}
+                <Link to="/contribution-terms" className="text-evidence-blue underline">
+                  contribution terms
+                </Link>
+                . To propose a structure, the text you paste is sent to Anthropic, our AI
+                provider — its proposal is reviewed and confirmed by you before anything can be
+                published. See{" "}
+                <Link to="/ai" className="text-evidence-blue underline">
+                  how AI is used
+                </Link>
+                .
+              </p>
             </div>
           </Form>
 

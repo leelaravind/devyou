@@ -214,6 +214,17 @@ export default function Publish({ loaderData, actionData }: Route.ComponentProps
               here is either something you wrote or something you read and ticked.
             </span>
           </li>
+          <li className="flex items-start gap-2">
+            <Icon name="info" size={14} className="mt-0.5 shrink-0" />
+            <span>
+              You keep ownership. Publishing licenses this revision to the site under the{" "}
+              <Link to="/contribution-terms" className="text-evidence-blue underline">
+                contribution terms
+              </Link>{" "}
+              — and because published revisions are permanent by design, that licence does not
+              lapse.
+            </span>
+          </li>
         </ul>
       </Card>
 

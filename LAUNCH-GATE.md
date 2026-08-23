@@ -141,9 +141,28 @@ untouched because two concurrent sessions were writing.
 | # | Action | Blocks |
 |---|---|---|
 | A0-1 | **Done** for `dev-admin.itisyou.app` — Access application created and enforcing on every path. See the note below | — |
-| A0-3 | Decide the public content licence and contribution terms (ADR-0013) | Opening unrestricted public contribution |
+| A0-3 | **Narrowed** 23 Aug 2026 — external-source policy and contribution terms decided and recorded in ADR-0013; the legal set (`/privacy`, `/terms`, `/contribution-terms`, `/content-policy`, `/acceptable-use`, `/ai`) is written, tested and VERIFIED STAGING. Open half: the outbound public reuse licence over published playbooks. See the note below | Outbound licence only; contribution terms no longer block |
 | A0-4 | **Done** — OAuth app registered, both secrets on `devyou-app`, sign-in verified in a real browser on 23 August 2026 | — |
 | — | **Done** — `ANTHROPIC_API_KEY` moved to `devyou-jobs` and deleted from `devyou-app` | — |
+
+### A0-3, narrowed 23 August 2026
+
+The owner decided the external-source policy ("external sources are evidence, never
+content to copy") and the contribution-terms shape (ownership stays with the
+contributor; itisyou.app receives the permissions the product actually needs;
+published material's grant is irrevocable because publication here is permanent by
+design). Recorded in ADR-0013 and implemented as six public routes with a footer
+legal nav, terms links on every submission surface, an Anthropic disclosure at the
+point of capture, and 67 source-level guards plus an 18-test Playwright spec.
+Evidence: [`docs/evidence/legal-pages-2026-08-23.md`](docs/evidence/legal-pages-2026-08-23.md).
+
+Two things remain open, and neither is cosmetic. **The outbound public reuse licence
+is undecided** — until a superseding ADR, published playbooks are their contributors'
+copyright with no general reuse licence, and every contribution accepted meanwhile
+deepens the future relicensing cost. **The legal set is VERIFIED STAGING, not
+production** — the production deploy was not permitted from the implementing session;
+`pnpm run deploy:production` in `apps/app` ships it, and the E2E suite with
+`BASE_URL=https://dev.itisyou.app` re-verifies it.
 
 ### A0-1, verified 22 August 2026
 

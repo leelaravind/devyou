@@ -230,6 +230,19 @@ export default function Contribute({ loaderData }: Route.ComponentProps) {
               silently here.
             </span>
           </li>
+          <li className="flex items-start gap-2">
+            <Icon name="info" size={14} className="mt-0.5 shrink-0" />
+            <span>
+              <strong className="text-on-surface">You keep ownership of what you write.</strong>{" "}
+              Contributing grants this site the permissions it needs to host, structure and
+              display your material, and nothing more — the{" "}
+              <Link to="/contribution-terms" className="text-evidence-blue underline">
+                contribution terms
+              </Link>{" "}
+              say exactly what that means, including that structuring sends your text to an AI
+              provider for you to review.
+            </span>
+          </li>
         </ul>
       </section>
 

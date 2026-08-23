@@ -137,6 +137,17 @@ export default function SignIn({ loaderData }: Route.ComponentProps) {
           <p className="mt-2 text-center text-body-sm text-on-surface-variant">
             We ask GitHub for no permissions beyond your public profile.
           </p>
+          <p className="mt-1 text-center text-body-sm text-on-surface-variant">
+            Signing in is covered by the{" "}
+            <Link to="/terms" className="text-evidence-blue underline">
+              terms of use
+            </Link>{" "}
+            and the{" "}
+            <Link to="/privacy" className="text-evidence-blue underline">
+              privacy notice
+            </Link>
+            .
+          </p>
         </Form>
       ) : (
         <Card>

@@ -155,6 +155,11 @@ migration; a content change is a new revision.
    `claude-opus-5` — the first real model call this product has made
    ([evidence](docs/evidence/ai-boundary-2026-08-22.txt)). The deployed queue consumer has
    still not structured a live contribution end to end.
-4. **A0-3** — the content licence, before unrestricted public contribution.
+4. **A0-3** — narrowed on 23 August 2026. The external-source policy and the contribution
+   terms are decided and recorded ([ADR-0013](docs/decisions/0013-public-licensing-and-contribution-terms.md)),
+   and the full legal set is written and linked from every page and submission surface.
+   What remains open is the **outbound public reuse licence** over published playbooks —
+   and it has a clock on it: contributions accepted under the current terms cannot be
+   relicensed later without per-contributor consent.
 5. Closed validation with real developers (plan §13). It is the one gate no amount of
    further engineering closes.

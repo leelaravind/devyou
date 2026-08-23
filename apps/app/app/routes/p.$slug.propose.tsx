@@ -296,6 +296,13 @@ export default function Propose({ loaderData, actionData }: Route.ComponentProps
         <Button type="submit" loading={navigation.state === "submitting"} iconLeft="add">
           Send it for review
         </Button>
+        <p className="text-body-sm text-on-surface-variant">
+          Sending a proposal is covered by the{" "}
+          <Link to="/contribution-terms" className="text-evidence-blue underline">
+            contribution terms
+          </Link>
+          .
+        </p>
       </Form>
     </main>
   );

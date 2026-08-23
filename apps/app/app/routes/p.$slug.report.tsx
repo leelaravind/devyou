@@ -371,6 +371,18 @@ export default function Report({ loaderData, actionData }: Route.ComponentProps)
             </p>
           )}
         </div>
+        {/*
+          One sentence, not a checkbox: R-31 budgets this whole flow at 10-30 seconds,
+          and the terms themselves say the load-bearing thing again — a filed report
+          is append-only.
+        */}
+        <p className="text-body-sm text-on-surface-variant">
+          Filing a report is covered by the{" "}
+          <Link to="/contribution-terms" className="text-evidence-blue underline">
+            contribution terms
+          </Link>
+          ; a filed report is permanent and cannot be withdrawn.
+        </p>
       </Form>
     </main>
   );
