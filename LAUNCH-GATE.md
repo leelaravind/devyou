@@ -43,7 +43,7 @@ else on this page matters.
 | 3 | A pasted error resolves to the right playbook | ✅ MRR 0.809, hit@3 88.9%, false-positive 0.0% |
 | 4 | The diagnostic flow works without JavaScript | ✅ 10 tests with JS disabled |
 | 5 | Evidence is segmented by environment, never averaged | ✅ compatibility matrix + conflict sentences |
-| 6 | Sign-in works, or says plainly that it is unconfigured | ⚠️ **unconfigured path verified; OAuth round-trip untested** — blocked on A0-4 |
+| 6 | Sign-in works, or says plainly that it is unconfigured | ⚠️ **unconfigured path verified; OAuth round-trip untested** — blocked on A0-4. Unrelated to admin access, which uses Cloudflare Access, not GitHub |
 | 7 | Malicious prompt text stays data; malformed model output fails safely | ✅ 10/10 against the real provider; the deployed consumer has not yet run a live contribution |
 | 8 | A reproduction can be filed in 10–30 seconds | ✅ |
 | 9 | Historical revisions survive and keep their own evidence | ✅ 11 tests against production |
@@ -61,7 +61,7 @@ else on this page matters.
 |---|---|---|
 | `devyou-app` | `dev.itisyou.app` | ✅ serving |
 | `devyou-jobs` | none (queue consumer only) | ✅ consuming `devyou-events-production` |
-| `devyou-admin` | `dev-admin.itisyou.app` | ⚠️ behind Cloudflare Access, and still refusing every request — the deployed build reads `CF_ACCESS_POLICY_AUD`, the secret is named `CF_ACCESS_AUD`. Fixed in source, not yet redeployed |
+| `devyou-admin` | `dev-admin.itisyou.app` | ✅ behind Cloudflare Access, redeployed with the `CF_ACCESS_AUD` rename, and backed by one active `dev_admin` |
 
 Production corpus: 43 playbooks, 44 published revisions (one superseded), 352 nodes,
 473 edges, 33 technologies, 171 aliases, 110 evidence records, **0 reproductions**.
@@ -93,8 +93,18 @@ controls are what hold regardless.
 **Sign-in is unconfigured.** Blocked on A0-4. Everything else works; reports filed now
 are shown and not counted, which the form says before submission.
 
-**The admin surface serves nothing.** Blocked on A0-1. It fails closed, which is the
-correct state to deploy in.
+**The admin surface has one administrator, provisioned out of band.** Both halves of the
+perimeter are now live: Access authenticates at the edge, and a `users` row with
+`role = 'dev_admin'` decides what that identity may do. The first role could not come from
+the console — `contributors:set_role` needs an existing admin, and self-action is refused
+outright, deliberately — so it came from `scripts/bootstrap-admin.mjs`, which writes the
+three rows and its own audit event and then **refuses to run again** once any active admin
+exists. A bootstrap that still works after bootstrap is a backdoor.
+
+The audit row for that grant carries `actor_id = NULL`, which is the honest value: no DevYou
+administrator performed it, because none existed. Writing the new admin's own id there would
+have recorded a self-promotion — the exact act the console refuses — and made the log claim
+something the system does not permit.
 
 **No AI result cache** (plan §11), and `duplicate_candidates` is written but not wired
 in. Both recorded rather than quietly skipped.

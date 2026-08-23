@@ -63,6 +63,36 @@ describe("resolving a DevYou actor from an Access identity", () => {
     expect(actor?.role).toBe("dev_admin");
   });
 
+  /*
+    Email casing, which is where provisioning goes wrong silently.
+
+    `claimsToIdentity` lower-cases the `email` claim before it becomes `identity.subject`,
+    and the lookup below matches `users.email` exactly. So a row stored with a capital
+    letter resolves for nobody, ever — and the symptom is "Cloudflare Access works but the
+    console says I am not an administrator", which is indistinguishable from having never
+    created the row at all. `scripts/bootstrap-admin.mjs` lower-cases for this reason; these
+    two tests are what keep that requirement true rather than remembered.
+  */
+  it("resolves a lower-cased row from a mixed-case Access claim", async () => {
+    const account = await makeUser({ role: "dev_admin" });
+    const actor = await resolveActor(env.DB, identity(account.email.toUpperCase().toLowerCase()));
+    expect(actor?.userId).toBe(account.id);
+  });
+
+  it("gives nothing when the stored email is not lower-cased", async () => {
+    const id = `usr_test_mixed_case`;
+    await env.DB.prepare(
+      `INSERT INTO users (id, created_at, status, email, role) VALUES (?1, 1, 'active', ?2, 'dev_admin')`,
+    )
+      .bind(id, "Mixed.Case@Example.Com")
+      .run();
+
+    /* The identity always arrives lower-cased, so this account is unreachable. Asserted so
+       that anybody tempted to "fix" it with a COLLATE NOCASE index sees the intent first:
+       the lookup is exact, and provisioning is what must normalise. */
+    expect(await resolveActor(env.DB, identity("mixed.case@example.com"))).toBeNull();
+  });
+
   it("gives nothing to an Access identity with no DevYou account", async () => {
     /*
       The headline requirement. Somebody in the Zero Trust directory, admitted by the
