@@ -372,3 +372,102 @@ retro-applied to it without a fresh structuring call.
 
 Finding 3 needs no reprocessing: `effectiveSafety` is recomputed at render and at the
 gate, so the correction above is live for that draft now.
+
+---
+
+## 8. Regression test on newly structured data — 23 August 2026
+
+The fixes in §7 were verified on *stored* output. This is the same submission put through
+the deployed pipeline again, so the corrections are proved on data the fixed code
+produced rather than on data it was applied to afterwards.
+
+Identical input, deliberately. The only variable is the code.
+
+**Draft** `drf_01M0QD3DH937P2KMJW116WFTRK` · **Task** `aij_01M0QD3DHZ54ZW0M83QC26AYXQ`
+`anthropic:claude-opus-5`, prompt `2026-08-22.1`, **4,036 in / 3,175 out**, 35,285 ms,
+`repair_attempted = 0`, **99,555 µUSD ($0.0996)**. Distinct `input_hash` from the first
+run, so no cache and no duplicate billing.
+
+### Finding 1 — environment reached the draft
+
+| | First run | This run |
+|---|---|---|
+| `constraints` | **0** | **2** |
+| `technologySlugs` | wrangler, cloudflare-d1 | wrangler, **nodejs**, cloudflare-d1 |
+
+```
+wrangler  4.125 → 4.125   known_affected
+nodejs    22.22 → 22.22   known_affected
+```
+
+`nodejs` is the one that matters. The model said "Node"; `slugify` gives `node`; the
+taxonomy stores `nodejs`; the alias resolved it and the version came with it. Previously
+both were discarded in silence.
+
+`pnpm 11` is still absent, and correctly so — `pnpm` is not in the taxonomy, and an
+approximate match would file the playbook where nobody searches.
+
+### Finding 2 — provenance is no longer uniform
+
+| Provenance | First run | This run |
+|---|---|---|
+| `ai_extracted` | 22 | 20 |
+| `user_supplied` | 0 | 2 |
+| `ai_inferred_requires_confirmation` | **0** | **2** |
+
+The two downgraded fields are `/nodes/1/expectedOutput` and `/nodes/4/expectedOutput` —
+descriptions the model wrote ("Per the author: the command succeeds when…", "The absolute
+filesystem path to wrangler's package.json…") which appear nowhere in the submission.
+
+The two `user_supplied` rows are the constraint versions `4.125` and `22.22`. The model
+claimed the strongest provenance available and **kept it, because the claim is true** —
+both strings are in the text. That is the check working in the direction that matters
+least dramatically and matters most: it does not punish honesty.
+
+**`commandText` now carries provenance at all** — three rows where there were none. All
+three ground verbatim in this run, so all three stay `ai_extracted`. The model happened
+not to invent a placeholder command this time; §7 shows what happens when it does.
+
+### Finding 3 — the escalation was corrected
+
+The model was less aggressive this run — `state_changing` rather than `destructive` — and
+still wrong about the same read:
+
+```
+node 0  model=state_changing  shown=informational   CORRECTED
+node 1  model=state_changing  shown=informational   CORRECTED
+node 4  model=informational   shown=informational
+```
+
+### The gate now blocks for the right reason
+
+```
+constraints present: 2
+allowed: false
+BLOCKER  unconfirmed_ai_fields
+```
+
+`no_environment_constraints` **no longer fires**. The draft is still refused — by
+`unconfirmed_ai_fields`, because two values the model could not ground need a human. That
+is the whole point of the exercise: publication is blocked by an actual unverified claim
+rather than by information the pipeline threw away.
+
+### Records created, and the corpus
+
+| Table | Rows |
+|---|---|
+| `contribution_drafts` | 1 — `drf_01M0QD3DH937P2KMJW116WFTRK`, `awaiting_review` |
+| `ai_tasks` | 1 — `aij_01M0QD3DHZ54ZW0M83QC26AYXQ`, `succeeded` |
+| `draft_field_provenance` | 24 |
+
+| | Baseline | After |
+|---|---|---|
+| playbooks | 43 | **43** |
+| published revisions | 44 | **44** |
+| evidence records | 110 | **110** |
+| reproduction reports | 0 | **0** |
+| diagnostic nodes | 352 | **352** |
+| moderation cases | 0 | **0** |
+
+Cumulative AI spend across both runs: **218,101 µUSD ($0.218)**, against a $2/day ceiling.
+Nothing published. Nothing in the corpus touched.
